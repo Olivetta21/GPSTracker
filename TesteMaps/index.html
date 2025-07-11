@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Simulador de Rastreamento</title>
+  <meta charset="utf-8">
+  <style>
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
+  </style>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBJ4hpu94rGCV9VNmIvA8jG746HmrXwXb4"></script>
+  <script>
+    let mapa;
+    let caminho = [
+      { lat: -23.55052, lng: -46.63331 },
+      { lat: -23.55090, lng: -46.63280 },
+      { lat: -23.55140, lng: -46.63230 },
+      { lat: -23.55180, lng: -46.63170 },
+      { lat: -23.55220, lng: -46.63110 },
+      { lat: -23.55270, lng: -46.63050 },
+      { lat: -23.55310, lng: -46.62990 }
+    ];
+
+    let coordenadasMostradas = [];
+    let marcador = null;
+    let linha = null;
+    let index = 0;
+
+    function initMap() {
+      mapa = new google.maps.Map(document.getElementById("map"), {
+        zoom: 17,
+        center: caminho[0],
+        mapTypeId: 'roadmap'
+      });
+
+      // Inicia com o primeiro ponto
+      coordenadasMostradas.push(caminho[0]);
+      marcador = new google.maps.Marker({
+        position: caminho[0],
+        map: mapa,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 6,
+          fillColor: "#00F",
+          fillOpacity: 1,
+          strokeWeight: 0
+        }
+      });
+
+      linha = new google.maps.Polyline({
+        path: coordenadasMostradas,
+        strokeOpacity: 0,
+        icons: [{
+          icon: {
+            path: 'M 0,-1 0,1',
+            strokeOpacity: 1,
+            scale: 4
+          },
+          offset: '0',
+          repeat: '10px'
+        }],
+        map: mapa
+      });
+
+      // Inicia atualização a cada 5 segundos
+      setInterval(atualizarRota, 5000);
+    }
+
+    function atualizarRota() {
+      index++;
+      if (index >= caminho.length) return;
+
+      const novaCoord = caminho[index];
+      coordenadasMostradas.push(novaCoord);
+
+      // Atualiza marcador
+      marcador.setPosition(novaCoord);
+      mapa.panTo(novaCoord);
+
+      // Atualiza a linha tracejada
+      linha.setPath(coordenadasMostradas);
+    }
+  </script>
+</head>
+<body onload="initMap()">
+  <div id="map"></div>
+</body>
+</html>
