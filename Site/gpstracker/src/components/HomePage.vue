@@ -1,22 +1,22 @@
 <template>
     <div id="map-chart">
         <div id="google-map"></div>
-        <div v-if="mfltop" id="map-floating-top">
-            <div id="map-cont">
-                <span class="button-a" @click="mfltop = !mfltop"> &#10799; </span>
-                <select>
-                    <option v-for="i in 100" :key="i">Option {{ i }}</option>
-                </select>
-                <p> 10 </p>
-                <span class="button-a"> &lt; </span>
-                <span class="button-a"> &bull; </span>
-                <span class="button-a"> &gt; </span>
-                <p> 12:25,33 </p>
-            </div>
-        </div>
-        <div v-else id="map-floating-top" class="closed">
-            <div id="map-cont">
-                <span class="button-a" @click="mfltop = !mfltop"> &lt; </span>
+        <div id="map-floating-top" :class="{ closed: !mfltop }">
+            <div id="map-cont" class="panels-shadow">
+                <template v-if="mfltop">
+                    <span class="button-a" @click="mfltop = !mfltop"> &#10799; </span>
+                    <select>
+                        <option v-for="i in 100" :key="i">Option {{ i }}</option>
+                    </select>
+                    <p> 10 </p>
+                    <span class="button-a"> &lt; </span>
+                    <span class="button-a"> &bull; </span>
+                    <span class="button-a"> &gt; </span>
+                    <p> 12:25,33 </p>
+                </template>
+                <template v-else>
+                    <span class="button-a" @click="mfltop = !mfltop"> &lt; </span>
+                </template>
             </div>
         </div>
     </div>

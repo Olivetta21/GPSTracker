@@ -1,19 +1,37 @@
 <template>
     <div id="home-page">
-        <div id="content-panel">
+        <div id="panel-holder" class="panels-shadow">
             <div @click="contpanel = !contpanel" id="toggle-panel" :class="['button-a', { closed: !contpanel }]">
                 <p> &lt; </p>
             </div>
-            <div v-if="contpanel" id="content"> 
-                <div id="content-header">
+            <div v-if="contpanel" id="panel"> 
+                <div id="panel-header">
                     <p>usuario</p>
                 </div>
-                <div>
-                    <ul>
-                        <li>Item 1</li>
-                        <li>Item 2</li>
-                        <li>Item 3</li>
-                    </ul>
+                <div id="panel-content">
+                    <div id="opt-buttons">
+                        <span class="button-b"> configurações </span>
+                        <span class="button-b"> carros </span>
+                        <span class="button-b"> usuario </span>
+                        <span class="button-b"> configurações </span>
+                        <span class="button-b"> carros </span>
+                        <span class="button-b"> usuario </span>
+                        <span class="button-b"> configurações </span>
+                        <span class="button-b"> carros </span>
+                        <span class="button-b"> usuario </span>
+                    </div>
+                    <div id="loc-registers">
+                        <p>Registros de localização</p>
+                        <div id="loc-date-selection">
+                            <input type="date" value="2025-07-01">
+                            <p>até</p>
+                            <input type="date" value="2025-07-31">
+                            <p class="button-b">atualizar</p>
+                        </div>
+                        <div id="loc-list">
+                            <p v-for="i in 49" :key="i">hora: 12:{{ 10+i }},30 lat: {{i*2.5872}} lng: {{ i * 1.3142 }}</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -41,6 +59,18 @@ export default {
 .button-a:hover {
     color: black;
 }
+.button-b {
+    cursor: pointer;
+    padding: 8px;
+    border: 2px solid #b3b3b3;
+    border-radius: 5px;
+}
+.button-b:hover {
+    background-color: #cccccc;
+}
+.panels-shadow {
+    box-shadow: 20px -20px 20px 20px #0000001a;
+}
 </style>
 
 <style scoped>
@@ -52,21 +82,50 @@ export default {
     flex-direction: row;
 }
 
-#content-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+#panel {
+    width: 300px;
+    height: auto;
 }
 
-#content-panel {
+
+#panel-holder {
+    z-index: 1;
     background-color: #f0f0f0;
     display: flex;
     flex-direction: row-reverse;
 }
 
-#content {
-    width: 300px;
-    height: auto;
+#panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+#panel-content {
+    display: flex;
+    flex-direction: column;
+}
+
+#opt-buttons {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-evenly;
+}
+
+#loc-date-selection {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+#loc-list {
+    overflow: auto;
+    scrollbar-width: none;
+    height: 150px;
+    width: 100%;
+    text-wrap: nowrap;
 }
 
 #toggle-panel {
@@ -94,11 +153,11 @@ export default {
     #home-page {
         flex-direction: column-reverse;
     }
-    #content-panel {
+    #panel-holder {
         flex-direction: column;
     }
 
-    #content {
+    #panel {
         width: auto;
         height: 300px;
     }
