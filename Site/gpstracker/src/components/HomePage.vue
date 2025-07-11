@@ -1,22 +1,22 @@
 <template>
-    <div id="home-page">
-        <div id="content-panel"> 
-            <ul>
-                <li>Item 1</li>
-                <li>Item 2</li>
-                <li>Item 3</li>
-            </ul>
-            <button> test </button>
+    <div id="map-chart">
+        <div id="google-map"></div>
+        <div v-if="mfltop" id="map-floating-top">
+            <div id="map-cont">
+                <span class="button-a" @click="mfltop = !mfltop"> &#10799; </span>
+                <select>
+                    <option v-for="i in 100" :key="i">Option {{ i }}</option>
+                </select>
+                <p> 10 </p>
+                <span class="button-a"> &lt; </span>
+                <span class="button-a"> &bull; </span>
+                <span class="button-a"> &gt; </span>
+                <p> 12:25,33 </p>
+            </div>
         </div>
-        <div id="map-chart">
-            <div id="google-map"></div>
-            <div id="map-floating-top">
-                <div id="map-cont">
-                    <button> back </button>    
-                    <button> next </button>
-                    <button> zoom in </button>
-                    <button> zoom out </button>
-                </div>
+        <div v-else id="map-floating-top" class="closed">
+            <div id="map-cont">
+                <span class="button-a" @click="mfltop = !mfltop"> &lt; </span>
             </div>
         </div>
     </div>
@@ -27,7 +27,11 @@
 
 
 export default {
-    name: 'HomePage',
+    data() {
+        return {
+            mfltop: true,
+        };
+    },
 
     ///* global google */
     //
@@ -43,14 +47,9 @@ export default {
 };
 </script>
 
-<style scoped>
-#home-page {
-    width: 100vw;
-    height: 100vh;
 
-    display: flex;
-    flex-direction: row;
-}
+<style scoped>
+
 #map-chart {
     width: 100%;
     height: 100%;
@@ -62,26 +61,32 @@ export default {
     height: 100%;
 }
 #map-floating-top {
+    pointer-events: none;
+
     position: absolute;
-    top: 5px;
+    top: 25px;
     left: 0;
     width: 100%;
     
     display: flex;
     justify-content: center;
 }
-#map-cont {
+#map-floating-top.closed {    
+    justify-content: flex-end;
+}
+#map-cont {    
+    pointer-events: visible;
     display: flex;
     justify-content: space-around;
+    flex-wrap: wrap;
     
-    border-radius: 5px;
+    border-radius: 8px;
     background-color: white;
 
-    gap: 5px;
-    padding: 5px;
+    gap: 10px;
+    padding: 10px;
 }
-#content-panel {
-    background-color: #f0f0f0;
-    padding: 20px;
-}
+
+
+
 </style>
