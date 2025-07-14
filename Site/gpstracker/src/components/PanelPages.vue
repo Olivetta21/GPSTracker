@@ -10,15 +10,8 @@
                 </div>
                 <div id="panel-content">
                     <div id="opt-buttons">
-                        <span class="button-b"> configurações </span>
-                        <span class="button-b"> carros </span>
-                        <span class="button-b"> usuario </span>
-                        <span class="button-b"> configurações </span>
-                        <span class="button-b"> carros </span>
-                        <span class="button-b"> usuario </span>
-                        <span class="button-b"> configurações </span>
-                        <span class="button-b"> carros </span>
-                        <span class="button-b"> usuario </span>
+                        <span class="button-b" @click="router.push({ name: 'home' })"> Inicio </span>
+                        <span class="button-b" @click="router.push({ name: 'cadveiculos' })"> Veiculos </span>
                     </div>
                     <div id="loc-registers">
                         <p>Registros de localização</p>
@@ -42,9 +35,12 @@
 </template>
 
 <script>
+import router from '../scripts/routes/router';
+
 export default {
     data() {
         return {
+            router: router,
             contpanel: true,
         };
     },

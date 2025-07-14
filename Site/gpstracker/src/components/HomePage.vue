@@ -5,14 +5,18 @@
             <div id="map-cont" class="panels-shadow">
                 <template v-if="mfltop">
                     <span class="button-a" @click="mfltop = !mfltop"> &#10799; </span>
-                    <select>
-                        <option v-for="i in 100" :key="i">Option {{ i }}</option>
+                    <select v-if="Home.veiculo.get().length > 0" v-model="Home.veiculo.selected" @change="Home.veiculo.r_atualizar()">
+                        <option v-for="(v, index) in Home.veiculo.get()" :key="v.id" :value="index">{{ v.nome }}</option>
                     </select>
-                    <p> 10 </p>
-                    <span class="button-a"> &lt; </span>
-                    <span class="button-a"> &bull; </span>
-                    <span class="button-a"> &gt; </span>
-                    <p> 12:25,33 </p>
+                    <span v-else class="button-b" @click="$router.push({ name: 'criar-veiculo' })"> + Adicionar Veículo </span>
+                    <template v-if="Home.veiculo.r_idx_act !== null">
+                        <p> {{ Home.veiculo.r_getID() }}</p>
+                        <span class="button-a" @click="Home.veiculo.r_back()"> &lt; </span>
+                        <span class="button-a" @click="Home.veiculo.r_atualizar()"> &bull; </span>
+                        <span class="button-a" @click="Home.veiculo.r_next()"> &gt; </span>
+                        <p> {{ Home.veiculo.r_getData() }} </p>
+                    </template>
+                    <p v-else @click="Home.veiculo.r_atualizar()"> Sem rastreios. </p>
                 </template>
                 <template v-else>
                     <span class="button-a" @click="mfltop = !mfltop"> &lt; </span>
@@ -24,11 +28,18 @@
 
 
 <script>
+import Home from '../scripts/telas/home/Home';
+import CadastrosVeiculos from '../scripts/telas/veiculos/CadastrosVeiculos';
+
 
 
 export default {
     data() {
         return {
+            CadastrosVeiculos,
+            Home,
+
+
             mfltop: true,
         };
     },
@@ -78,6 +89,7 @@ export default {
     pointer-events: visible;
     display: flex;
     justify-content: space-around;
+    align-items: center;
     flex-wrap: wrap;
     
     border-radius: 8px;
