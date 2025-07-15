@@ -76,6 +76,17 @@ class Gmaps {
         }
         
     }
+
+    static clearTrack() {
+        if (this.marker) {
+            this.marker.setMap(null);
+            this.marker = null;
+        }
+        if (this.line) {
+            this.line.setMap(null);
+            this.line = null;
+        }
+    }
 }
 
 export default Gmaps;

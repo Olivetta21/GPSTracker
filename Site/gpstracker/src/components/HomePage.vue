@@ -14,7 +14,7 @@
                         <span class="button-a" @click="Home.veiculo.r_back()"> &lt; </span>
                         <span class="button-a" @click="Home.veiculo.r_atualizar()"> &bull; </span>
                         <span class="button-a" @click="Home.veiculo.r_next()"> &gt; </span>
-                        <p> {{ Home.veiculo.r_getData() }} </p>
+                        <p> {{ formatDate(Home.veiculo.r_getData(), 'time') }} </p>
                         <p @click="Home.veiculo.r_initTrack()"> track </p>
                     </template>
                     <p v-else @click="Home.veiculo.r_atualizar()"> Sem rastreios. </p>
@@ -29,7 +29,8 @@
 
 
 <script>
-import Gmaps from '@/scripts/mapa/Gmaps';
+import { formatDate } from '../scripts/utils';
+import Gmaps from '../scripts/mapa/Gmaps';
 import Home from '../scripts/telas/home/Home';
 import CadastrosVeiculos from '../scripts/telas/veiculos/CadastrosVeiculos';
 
@@ -40,7 +41,7 @@ export default {
         return {
             CadastrosVeiculos,
             Home,
-
+            formatDate,
 
             mfltop: true,
         };

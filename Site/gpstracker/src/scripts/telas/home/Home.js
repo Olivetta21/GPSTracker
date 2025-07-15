@@ -51,6 +51,7 @@ class Home extends Janela {
 
         r_atualizar() {
             this.r_idx_act = null;
+            Gmaps.clearTrack();
 
             let tmp = this.pick();
             if (tmp !== null) {
@@ -58,6 +59,7 @@ class Home extends Janela {
                     this.r_idx_act = tmp.rastreios.length - 1;
                 }
                 this.r_centerMap();
+                this.r_initTrack();
             }
         },
 

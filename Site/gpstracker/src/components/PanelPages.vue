@@ -14,7 +14,10 @@
                         <span class="button-b" @click="router.push({ name: 'cadveiculos' })"> Veiculos </span>
                     </div>
                     <div id="loc-registers">
-                        <p>Registros de localização</p>
+                        <div>                            
+                            <p>Registros de localização</p>
+                            <p> {{ Home.veiculo.pick()?.nome || 'Nenhum veiculo selecionado' }} </p>
+                        </div>
                         <div id="loc-date-selection">
                             <input type="date" value="2025-07-01">
                             <p>até</p>
@@ -22,7 +25,11 @@
                             <p class="button-b">atualizar</p>
                         </div>
                         <div id="loc-list">
-                            <p v-for="i in 49" :key="i">hora: 12:{{ 10+i }},30 lat: {{i*2.5872}} lng: {{ i * 1.3142 }}</p>
+                            <p v-for="(v, idx) in Home.veiculo.pick()?.rastreios" :key="idx"
+                            :class="{'active': Home.veiculo.r_idx_act === idx}"
+                            @click="Home.veiculo.r_idx_act = idx; Home.veiculo.r_centerMap()">
+                            Hora: {{ formatDate(v.data, 'time') }}
+                        </p>
                         </div>
                     </div>
                 </div>
@@ -35,13 +42,17 @@
 </template>
 
 <script>
+import Home from '../scripts/telas/home/Home';
 import router from '../scripts/routes/router';
+import { formatDate } from '../scripts/utils';
 
 export default {
     data() {
         return {
+            Home,
             router: router,
             contpanel: true,
+            formatDate,
         };
     },
 }
@@ -122,6 +133,14 @@ export default {
     height: 150px;
     width: 100%;
     text-wrap: nowrap;
+}
+#loc-list>p:hover {
+    background-color: #a5a5a5;
+    cursor: pointer;
+}
+#loc-list>p.active {
+    background-color: black;
+    color: white;;
 }
 
 #toggle-panel {

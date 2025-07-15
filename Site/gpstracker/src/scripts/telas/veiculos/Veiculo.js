@@ -3,6 +3,9 @@
 //    lat;
 //    lng;
 //    data;
+
+import { formatDate } from "../../../scripts/utils";
+
 //}
 let tmp = 0;
 let lats = 1;
@@ -19,7 +22,7 @@ class Veiculo {
             id: tmp++,
             lat: 10 + lats * Math.random(),
             lng: lngs * Math.random() + (-lngs) * Math.random(),
-            data: '2025-07-'+tmp
+            data: formatDate(new Date(), 'date') + ' ' + formatDate(new Date(), 'time') + '-04'
         })
     }
 }
