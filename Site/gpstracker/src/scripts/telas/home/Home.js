@@ -2,6 +2,7 @@ import { ref } from "vue";
 import Janela from "../Janela";
 import CadastrosVeiculos from "../veiculos/CadastrosVeiculos";
 import Gmaps from "@/scripts/mapa/Gmaps";
+import { formatDate } from "@/scripts/utils";
 
 class Home extends Janela {
 
@@ -11,6 +12,12 @@ class Home extends Janela {
         
         selected: null,
         r_idx_act: null,
+        r_dateIn: null,
+        r_dateFi: null,
+
+        testDate() {
+            console.log("Test Date:", this.r_dateIn, this.r_dateFi);
+        },
 
         get() {
             return CadastrosVeiculos.veiculos;
@@ -21,13 +28,21 @@ class Home extends Janela {
             }
             return null;
         },
-        
+
+        r_get() {
+            let rastreios = this.pick()?.rastreios || [];
+            if (rastreios.length > 0) {
+                rastreios = rastreios.filter(r => new Date(formatDate(r.data, 'date')) >= new Date(this.r_dateIn) && new Date(formatDate(r.data, 'date')) <= new Date(this.r_dateFi));
+            }
+            return rastreios;
+        },
+
         r_initTrack() {
-            Gmaps.initTrack(this.pick()?.rastreios || []);
+            Gmaps.initTrack(this.r_get());
         },
 
         r_centerMap() {
-            let rastreio = this.pick()?.rastreios?.[this.r_idx_act];
+            let rastreio = this.r_get()[this.r_idx_act];
             if (rastreio) {
                 Gmaps.setCenter(rastreio.lat, rastreio.lng);
             } else {
@@ -36,14 +51,14 @@ class Home extends Janela {
         },
 
         r_next() {
-            if (this.r_idx_act+1 < this.pick()?.rastreios?.length) {
+            if (this.r_idx_act+1 < this.r_get().length) {
                 this.r_idx_act++;
                 this.r_centerMap();
             }
         },
 
         r_back() {
-            if (this.r_idx_act-1 >= 0 && this.pick()?.rastreios?.length > 0) {
+            if (this.r_idx_act-1 >= 0 && this.r_get().length > 0) {
                 this.r_idx_act--;
                 this.r_centerMap();
             }
@@ -53,22 +68,20 @@ class Home extends Janela {
             this.r_idx_act = null;
             Gmaps.clearTrack();
 
-            let tmp = this.pick();
-            if (tmp !== null) {
-                if (tmp.rastreios.length > 0) {
-                    this.r_idx_act = tmp.rastreios.length - 1;
-                }
+            let tmp = this.r_get();
+            if (tmp && tmp.length > 0) {
+                this.r_idx_act = tmp.length - 1;                
                 this.r_centerMap();
                 this.r_initTrack();
             }
         },
 
         r_getID() {
-            return this.r_idx_act !== null ? this.pick()?.rastreios[this.r_idx_act]?.id : null;
+            return this.r_idx_act !== null ? this.r_get()[this.r_idx_act]?.id : null;
         },
 
         r_getData() {
-            return this.r_idx_act !== null ? this.pick()?.rastreios[this.r_idx_act]?.data : null;
+            return this.r_idx_act !== null ? this.r_get()[this.r_idx_act]?.data : null;
         },
 
     })

@@ -4,20 +4,6 @@ import Veiculo from "./Veiculo";
 
 
 class CadastrosVeiculos extends Janela {
-    static beforeOpen() {
-        console.log("abrir cadastros de veículos.");
-    }
-    static afterOpen() {
-        console.log("cadastros de veículos aberta.");
-    }
-    static beforeClose() {
-        console.log("fechar cadastros de veículos.");
-    }
-    static afterClose() {
-        console.log("cadastros de veículos fechada.");
-    }
-
-
     static _veiculos = ref([]);
     static get veiculos() {return this._veiculos.value;}
 
@@ -31,10 +17,6 @@ class CadastrosVeiculos extends Janela {
         this.veiculos.push(veiculo);
     }
 
-    static tmpid = 0;
-    static newTest() {
-        this.addVeiculo(this.tmpid++, "Carro A" + this.tmpid, "Carro", "123456");
-    }
 }
 
 export default CadastrosVeiculos;

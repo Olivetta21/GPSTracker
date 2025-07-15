@@ -19,13 +19,13 @@
                             <p> {{ Home.veiculo.pick()?.nome || 'Nenhum veiculo selecionado' }} </p>
                         </div>
                         <div id="loc-date-selection">
-                            <input type="date" value="2025-07-01">
+                            <input type="date" v-model="Home.veiculo.r_dateIn" @change="Home.veiculo.r_atualizar()">
                             <p>até</p>
-                            <input type="date" value="2025-07-31">
-                            <p class="button-b">atualizar</p>
+                            <input type="date" v-model="Home.veiculo.r_dateFi" @change="Home.veiculo.r_atualizar()">
+                            <p class="button-b" @click="Home.veiculo.testDate(); console.log(Home.veiculo.r_dateIn, Home.veiculo.r_dateFi)">atualizar</p>
                         </div>
                         <div id="loc-list">
-                            <p v-for="(v, idx) in Home.veiculo.pick()?.rastreios" :key="idx"
+                            <p v-for="(v, idx) in Home.veiculo.r_get()" :key="idx"
                             :class="{'active': Home.veiculo.r_idx_act === idx}"
                             @click="Home.veiculo.r_idx_act = idx; Home.veiculo.r_centerMap()">
                             Hora: {{ formatDate(v.data, 'time') }}
