@@ -8,7 +8,7 @@
             </div>
             <div>
                 <label for="vehicleType">Tipo de Veículo:</label>
-                <select id="vehicleType" name="vehicleType" v-model="tipo">
+                <select id="vehicleType" name="vehicleType" v-model="tipo" required>
                     <option value="carro">Carro</option>
                     <option value="moto">Moto</option>
                     <option value="caminhao">Caminhão</option>
@@ -38,3 +38,17 @@ export default {
     }
 }
 </script>
+
+
+<style>
+#cadveiculos {
+    width: 100%;
+    height: 100%;
+    
+    display: flex;    
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+</style>

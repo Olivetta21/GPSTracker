@@ -13,16 +13,17 @@
                         <span class="button-b" @click="router.push({ name: 'home' })"> Inicio </span>
                         <span class="button-b" @click="router.push({ name: 'cadveiculos' })"> Veiculos </span>
                     </div>
+                    <hr>
                     <div id="loc-registers">
-                        <div>                            
-                            <p>Registros de localização</p>
-                            <p> {{ Home.veiculo.pick()?.nome || 'Nenhum veiculo selecionado' }} </p>
+                        <p>Registros de localização</p>
+                        <div id="loc-vehicle-selection">                          
+                            <p> Veículo: </p>  
+                            <p class="panel-a"> {{ Home.veiculo.pick()?.nome || 'Nenhum veículo selecionado' }} </p>
                         </div>
                         <div id="loc-date-selection">
                             <input type="date" v-model="Home.veiculo.r_dateIn" @change="Home.veiculo.r_atualizar()">
                             <p>até</p>
                             <input type="date" v-model="Home.veiculo.r_dateFi" @change="Home.veiculo.r_atualizar()">
-                            <p class="button-b" @click="Home.veiculo.testDate(); console.log(Home.veiculo.r_dateIn, Home.veiculo.r_dateFi)">atualizar</p>
                         </div>
                         <div id="loc-list">
                             <p v-for="(v, idx) in Home.veiculo.r_get()" :key="idx"
@@ -32,6 +33,7 @@
                         </p>
                         </div>
                     </div>
+                    <hr>
                 </div>
             </div>
         </div>
@@ -61,7 +63,7 @@ export default {
 <style>
 .button-a {
     cursor: pointer;
-    color: gray;
+    color: var(--border-color-a);
 }
 .button-a:hover {
     color: black;
@@ -69,15 +71,21 @@ export default {
 .button-b {
     cursor: pointer;
     padding: 8px;
-    border: 2px solid #b3b3b3;
+    border: 2px solid var(--border-color-a);
     border-radius: 5px;
 }
 .button-b:hover {
-    background-color: #cccccc;
+    background-color: var(--border-color-a);
 }
 .panels-shadow {
     box-shadow: 20px -20px 20px 20px #0000001a;
 }
+.panel-a {
+    border: 1px solid var(--border-color-a);
+    border-radius: 5px;
+    padding: 5px;
+}
+
 </style>
 
 <style scoped>
@@ -111,6 +119,8 @@ export default {
 #panel-content {
     display: flex;
     flex-direction: column;
+    padding: 5px;
+    gap: 5px;
 }
 
 #opt-buttons {
@@ -120,19 +130,30 @@ export default {
     justify-content: space-evenly;
 }
 
+#loc-vehicle-selection{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+#loc-vehicle-selection>p:nth-child(2) {
+    flex: 1;
+}
+
 #loc-date-selection {
     display: flex;
     flex-direction: row;
-    justify-content: space-between;
+    justify-content: space-evenly;
     align-items: center;
     flex-wrap: wrap;
+    gap: 5px;
 }
 #loc-list {
     overflow: auto;
     scrollbar-width: none;
     height: 150px;
     width: 100%;
-    text-wrap: nowrap;
 }
 #loc-list>p:hover {
     background-color: #a5a5a5;
@@ -160,6 +181,7 @@ export default {
 
 #pagina {
     flex: 1;
+    overflow: auto;
 }
 
 

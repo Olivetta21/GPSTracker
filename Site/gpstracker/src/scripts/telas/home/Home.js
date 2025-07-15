@@ -15,10 +15,6 @@ class Home extends Janela {
         r_dateIn: null,
         r_dateFi: null,
 
-        testDate() {
-            console.log("Test Date:", this.r_dateIn, this.r_dateFi);
-        },
-
         get() {
             return CadastrosVeiculos.veiculos;
         },
