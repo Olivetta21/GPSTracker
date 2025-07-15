@@ -15,6 +15,7 @@
                         <span class="button-a" @click="Home.veiculo.r_atualizar()"> &bull; </span>
                         <span class="button-a" @click="Home.veiculo.r_next()"> &gt; </span>
                         <p> {{ Home.veiculo.r_getData() }} </p>
+                        <p @click="Home.veiculo.r_initTrack()"> track </p>
                     </template>
                     <p v-else @click="Home.veiculo.r_atualizar()"> Sem rastreios. </p>
                 </template>
@@ -28,6 +29,7 @@
 
 
 <script>
+import Gmaps from '@/scripts/mapa/Gmaps';
 import Home from '../scripts/telas/home/Home';
 import CadastrosVeiculos from '../scripts/telas/veiculos/CadastrosVeiculos';
 
@@ -43,8 +45,10 @@ export default {
             mfltop: true,
         };
     },
+    mounted() {
+        Gmaps.init(document.getElementById("google-map"));
+    }
 
-    ///* global google */
     //
     //mounted() {
     //    const map = new google.maps.Map(document.getElementById("google-map"), {

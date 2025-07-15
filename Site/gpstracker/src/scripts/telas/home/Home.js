@@ -1,6 +1,7 @@
 import { ref } from "vue";
 import Janela from "../Janela";
 import CadastrosVeiculos from "../veiculos/CadastrosVeiculos";
+import Gmaps from "@/scripts/mapa/Gmaps";
 
 class Home extends Janela {
 
@@ -21,22 +22,34 @@ class Home extends Janela {
             return null;
         },
         
+        r_initTrack() {
+            Gmaps.initTrack(this.pick()?.rastreios || []);
+        },
+
+        r_centerMap() {
+            let rastreio = this.pick()?.rastreios?.[this.r_idx_act];
+            if (rastreio) {
+                Gmaps.setCenter(rastreio.lat, rastreio.lng);
+            } else {
+                console.error("No rastreio found to center map on");
+            }
+        },
+
         r_next() {
             if (this.r_idx_act+1 < this.pick()?.rastreios?.length) {
                 this.r_idx_act++;
-                console.log("Next:" + this.r_idx_act);
+                this.r_centerMap();
             }
         },
 
         r_back() {
             if (this.r_idx_act-1 >= 0 && this.pick()?.rastreios?.length > 0) {
                 this.r_idx_act--;
-                console.log("Back:" + this.r_idx_act);
+                this.r_centerMap();
             }
         },
 
         r_atualizar() {
-            console.log("Atualizando veiculo do indice: " + this.selected);
             this.r_idx_act = null;
 
             let tmp = this.pick();
@@ -44,7 +57,7 @@ class Home extends Janela {
                 if (tmp.rastreios.length > 0) {
                     this.r_idx_act = tmp.rastreios.length - 1;
                 }
-                console.log("Veiculo atualizado", tmp);
+                this.r_centerMap();
             }
         },
 
