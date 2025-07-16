@@ -1,35 +1,50 @@
 import socket
+import struct
 import threading
+import random
 
-# Configurações do servidor
-HOST = '0.0.0.0'  # Aceita conexões de qualquer IP
-PORT = 12345      # Porta desejada
-
-# Função que trata cada cliente
 def handle_client(conn, addr):
-    print(f"[+] Nova conexão de {addr}")
+    print(f"[+] Conectado por {addr}")
     with conn:
         while True:
-            try:
-                data = conn.recv(1024)
-                if not data:
-                    break
-                print(f"[{addr}] Mensagem recebida: {data.decode().strip()}")
-                conn.sendall(b"Mensagem recebida com sucesso\n")
-            except ConnectionResetError:
+            data = conn.recv(18)
+            if not data:
+                print(f"Cliente {addr} desconectou")
                 break
-    print(f"[-] Conexão encerrada: {addr}")
 
-# Cria o socket TCP
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind((HOST, PORT))
-server.listen()
+            if len(data) != 18:
+                print(f"Pacote incompleto ({data} - {len(data)})")
+                continue
 
-print(f"[+] Servidor ouvindo em {HOST}:{PORT}")
+            lat, lng, token = struct.unpack('<ff10s', data)
+            token = token.decode(errors='ignore').rstrip('\x00')
 
-# Loop principal do servidor
-while True:
-    conn, addr = server.accept()
-    thread = threading.Thread(target=handle_client, args=(conn, addr))
-    thread.daemon = True  # Thread morre quando o programa principal termina
-    thread.start()
+            print(f"-----------\n{addr}\n|→ Latitude: {lat:.6f}\n|→ Longitude: {lng:.6f}\n|→ Token: '{token}'\n-----------")
+            
+            conn.sendall(b'\x01')
+
+
+
+def start_server(host='0.0.0.0', port=12345):
+    print("Starting server...")
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((host, port))
+        s.listen()
+        print(f"Servidor escutando em {host}:{port}...")
+
+        while True:
+            try:
+                conn, addr = s.accept()
+                thread = threading.Thread(target=handle_client, args=(conn, addr))
+                thread.daemon = True
+                thread.start()
+                
+            except KeyboardInterrupt:
+                print("\n[!] Servidor encerrado.")
+                break
+
+
+
+if __name__ == "__main__":
+    start_server()
+    print("tchau")

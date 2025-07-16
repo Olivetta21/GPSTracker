@@ -5,7 +5,7 @@
             <div id="veiculo-info">
                 <p id="live-id">id: {{ v.id }}</p>
                 <p id="live-nome">Nome: {{ v.nome }}</p>
-                <p id="live-tipo">Tipo: {{ v.tipo }}</p>
+                <p id="live-tipo" @click="v.addTesteR2()">Tipo: {{ v.tipo }}</p>
                 <p id="live-codigo" @click="v.addTesteR()">Código de Rastreamento: {{ v.codigo_rastreamento }}</p>
             </div>
             <div id="veiculo-rastreios">
