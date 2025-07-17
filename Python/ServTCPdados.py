@@ -2,73 +2,120 @@ import socket
 import struct
 import time
 import random
+from nacl.public import PrivateKey, PublicKey, Box
 
-HOST = '127.0.0.1'  # IP do servidor
-PORT = 12345        # Porta do servidor
-TOKEN = b'arduino01'  # Deve ter até 10 bytes
+# RESPONSE TABLE
+R_OK = b'\x01'
+R_PK = b'\x02'
+R_TK = b'\x03'
 
-def montar_pacote(lat, lng, token):
-    token_bytes = token[:10].ljust(10, b'\x00')
-    return struct.pack('<ff10s', lat, lng, token_bytes)
+# SERVER AND CLIENT CONFIGURATION
+HOST = '127.0.0.1'
+PORT = 12345
+TOKEN = b'arduino001'
+INTERVAL = 5
 
-def enviarPacote(sock, lat, lng):
-    pacote = montar_pacote(lat, lng, TOKEN)
-    sock.sendall(pacote)
-    print(f"[→] Enviando pacote: {lat:.6f}, {lng:.6f}")
-    
-    resposta = sock.recv(1024)
-    if resposta == None:
-        print("[!] Erro: Resposta vazia.")
+# SERVER ENCRYPTION
+SERVER_PUBLIC_HEX = '5173ed5025b8e0aabc53119349697cb2adf34236f467f89a8cd14f3f1b4e2719'
+client_public = None
+box = None
+
+
+def formatToken(token):
+    return token[:10].ljust(10, b'\x00') # Garantir 10 bytes
+
+def enviarLocalizacao(sock, lat, lng):    
+    if sock is None or sock.fileno() == -1:
+        print("[!] Socket inválido.")
         return False
+    
+    # Montar Pacote
+    encrypted = box.encrypt(
+        struct.pack('<ff', lat, lng) # 8 bytes total
+    )
+    sock.sendall(encrypted)
 
-    if resposta.startswith(b'\x01'):
-        print("[←] Sucesso:", resposta)
+    print(f"[→] Enviando: {lat:.6f}, {lng:.6f}\n[?] pacote criptografado: {encrypted.hex()}\n[~] Tamanho: {len(encrypted)} bytes")
+
+    resposta = sock.recv(1024)
+    if resposta == R_OK:
         return True
     else:
-        print("[←] Resposta:", resposta)
-
-    return False
+        print("[←] Resposta inesperada:", resposta)
+        return False
 
 def conectar():
-    while True:
-        try:
-            sock = socket.create_connection((HOST, PORT), timeout=5)
-            print("[+] Conectado ao servidor.")
-            return sock
-        except (ConnectionRefusedError, TimeoutError):
-            print("[-] Conexão falhou. Tentando novamente...")
-            time.sleep(2)
+    try:
+        sock = socket.create_connection((HOST, PORT), timeout=5)
+        # Enviando chave em plain text
+        print("[→] Enviando chave pública...")
+        sock.sendall(client_public.encode())
+        if sock.recv(1024) != R_PK:
+            print("[-] Resposta inesperada. Verifique a chave pública.")
+            sock.close()
+            return None
+        
+        # Enviando token já criptografado
+        print("[→] Enviando token...")
+        sock.sendall(box.encrypt(formatToken(TOKEN)))
+        if sock.recv(1024) != R_TK:
+            print("[-] Resposta inesperada. Verifique o token.")
+            sock.close()
+            return None
+
+        return sock
+    except Exception as e:
+        print(f"[-] Erro de conexão: {e}.")
+    return None
 
 def main():
-    sock = conectar()
+    global client_public, box
+    client_private = PrivateKey.generate()
+    client_public = client_private.public_key
+    box = Box(client_private, PublicKey(bytes.fromhex(SERVER_PUBLIC_HEX)))
 
-    mensagensNaoEnviadas = [] # guarda ultimas 99 mensagens para reenviar no caso de falha
+    sock = None
+    locsNotSended = []
+
+    # Timestamp inicial
+    last_time = 0
 
     while True:
         try:
+            # Esperar o minimo de segundos entre envios
+            timestamp = time.time()
+            interval = timestamp - last_time            
+            if interval < INTERVAL:
+                toWait = INTERVAL - interval
+                print(f"[⏳] Aguardando {toWait:.2f} segundos para o próximo envio...")
+                time.sleep(toWait)
+            last_time = time.time()
+
+            # Mock de localização
             lat = -20 - 10 * random.random()
             lng = -50 - 10 * random.random()
-            mensagensNaoEnviadas.append([lat, lng])
+            locsNotSended.append([lat, lng])
+            
+            if sock is None or sock.fileno() == -1:
+                sock = conectar()
 
-            print(f"Mensagens: {mensagensNaoEnviadas}")
-            while len(mensagensNaoEnviadas) > 0:
-                if enviarPacote(sock, mensagensNaoEnviadas[0][0], mensagensNaoEnviadas[0][1]):
-                    mensagensNaoEnviadas.pop(0)
-                else:
-                    print("[!] Falha ao enviar pacotes.")
-                    break
-
+            print(f"Localizações pendentes: {len(locsNotSended)}")
+            while len(locsNotSended) > 0:
                 
-            time.sleep(2)
+                if enviarLocalizacao(sock, locsNotSended[0][0], locsNotSended[0][1]):
+                    locsNotSended.pop(0)
+                    print("[←] Sucesso")
+                else:
+                    print("[!] Falha ao enviar localização.")
+                    break
+        
+        except TimeoutError:
+            print("[!] Tempo limite de conexão excedido.")
+            continue
 
-        except (TimeoutError):
-            print("[-] Timeout. Tentando reconectar...")
-            time.sleep(2)
-
-        except (ConnectionResetError, BrokenPipeError):
-            print("[-] Conexão perdida. Reestabelecendo...")
+        except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
+            print("[-] Conexão perdida...")
             sock.close()
-            sock = conectar()
 
         except KeyboardInterrupt:
             print("\n[!] Encerrando cliente.")
