@@ -13,7 +13,8 @@ R_TK = b'\x03'
 HOST = '127.0.0.1'
 PORT = 12345
 TOKEN = b'arduino001'
-INTERVAL = 5
+INTERVAL = 10
+MAXSTACK = 99
 
 # SERVER ENCRYPTION
 SERVER_PUBLIC_HEX = '5173ed5025b8e0aabc53119349697cb2adf34236f467f89a8cd14f3f1b4e2719'
@@ -69,10 +70,14 @@ def conectar():
     return None
 
 def main():
-    global client_public, box
+    global client_public, box, HOST, PORT, TOKEN
     client_private = PrivateKey.generate()
     client_public = client_private.public_key
     box = Box(client_private, PublicKey(bytes.fromhex(SERVER_PUBLIC_HEX)))
+
+    HOST = input(f"Endereço do host [{HOST}]: ") or HOST
+    PORT = input(f"Porta [{PORT}]: ") or PORT
+    TOKEN = input(f"Token [{TOKEN.decode()}]: ").encode() or TOKEN
 
     sock = None
     locsNotSended = []
@@ -90,18 +95,22 @@ def main():
                 print(f"[⏳] Aguardando {toWait:.2f} segundos para o próximo envio...")
                 time.sleep(toWait)
             last_time = time.time()
+            print("[O] Enviando...")
 
             # Mock de localização
             lat = -20 - 10 * random.random()
             lng = -50 - 10 * random.random()
             locsNotSended.append([lat, lng])
+
+            if len(locsNotSended) > MAXSTACK:
+                print(f"[!] Pilha de localizações excedida ({len(locsNotSended)}).")
+                locsNotSended = locsNotSended[-MAXSTACK:]
             
             if sock is None or sock.fileno() == -1:
                 sock = conectar()
 
             print(f"Localizações pendentes: {len(locsNotSended)}")
-            while len(locsNotSended) > 0:
-                
+            while len(locsNotSended) > 0:                
                 if enviarLocalizacao(sock, locsNotSended[0][0], locsNotSended[0][1]):
                     locsNotSended.pop(0)
                     print("[←] Sucesso")

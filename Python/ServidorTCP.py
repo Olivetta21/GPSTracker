@@ -14,7 +14,6 @@ R_TK = b'\x03'
 
 # GLOBAL VARIABLES
 server_private = None
-clientes = {}
 
 def receberChavePublica(conn):
     pubkey_cliente = conn.recv(32)
@@ -42,7 +41,6 @@ def handle_client(conn, addr):
             return
         conn.sendall(R_PK)
         box = Box(server_private, cliente_public_key)
-        clientes[conn] = box
 
         # Pegar token descriptografado do cliente
         cliente_token = receberTokenCliente(conn, box)
@@ -83,8 +81,6 @@ def handle_client(conn, addr):
         time.sleep(2)
     finally:
         conn.close()
-        if conn in clientes:
-            del clientes[conn]
 
 def start_server(host='0.0.0.0', port=12345):
     print("🔐 Servidor criptografado iniciado...")
