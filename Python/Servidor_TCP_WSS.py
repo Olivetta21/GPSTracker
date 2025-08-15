@@ -12,9 +12,8 @@ import queue
 
 
 
-
-
 load_dotenv()
+
 
 
 class VehLocation:
@@ -23,6 +22,8 @@ class VehLocation:
         self.lat = lat
         self.lng = lng
 
+class AuthError(Exception):
+    pass
 
 class TCP:
     # RESPONSE TABLE
@@ -35,7 +36,7 @@ class TCP:
     def __new__(cls):
         if not TCP.SERVER_PRIVATE:
             TCP.print("[!] Chave privada do servidor não configurada.")
-            raise ValueError("Chave privada do servidor não configurada.")
+            raise AuthError("Chave privada do servidor não configurada.")
         TCP.print(f"Chave pública do servidor: {TCP.SERVER_PRIVATE.public_key.encode().hex()}")
         return super().__new__(cls)
 
@@ -47,82 +48,99 @@ class TCP:
     def print(msg):
         print(f"[TCP]{msg}")
 
-    def recCliPubKey(self, conn):
-        try:
-            pubkey_cliente = conn.recv(32)
-            if len(pubkey_cliente) != 32:
+
+    class ConnVehicle:
+        def recVehPubKey(self, conn):
+            try:
+                pubkey_veiculo = conn.recv(32)
+                if len(pubkey_veiculo) != 32:
+                    return None
+                return PublicKey(pubkey_veiculo)
+            except Exception as e:
+                TCP.print(f"[!] Erro ao receber chave pública do veículo: {e}")
                 return None
-            return PublicKey(pubkey_cliente)
-        except Exception as e:
-            self.print(f"[!] Erro ao receber chave pública do cliente: {e}")
-            return None
 
-    def recCliToken(self, conn, BOX):
-        try:
-            token = BOX.decrypt(conn.recv(1024))
-            if len(token) != 10:
+        def recVehToken(self, conn, BOX):
+            try:
+                token = BOX.decrypt(conn.recv(1024))
+                if len(token) != 10:
+                    return None
+                return token.decode(errors='ignore').rstrip('\x00')
+            except Exception as e:
+                TCP.print(f"[!] Erro ao receber token do veículo: {e}")
                 return None
-            return token.decode(errors='ignore').rstrip('\x00')
-        except Exception as e:
-            self.print(f"[!] Erro ao receber token do cliente: {e}")
-            return None
+            
 
-    def handleClient(self, conn, addr):
-        self.print(f"[+] Conectado por {addr}")
+        def __init__(self, conn, addr):
+            self.conn = conn
+            self.addr = addr
+            self.pub_key = None
+            self.token = None
+            self.box = None
+
+        def __enter__(self):
+            TCP.print(f"[+] Veículo conectado por {self.addr}")
+
+            # Chave publica do veículo
+            self.pub_key = self.recVehPubKey(self.conn)
+            if self.pub_key is None:
+                TCP.print(f"[!] Chave pública inválida de {self.addr}. Desconectando...")
+                raise AuthError("Chave pública inválida.")
+            self.conn.sendall(TCP.R_PK)
+            self.box = Box(TCP.SERVER_PRIVATE, self.pub_key)
+
+            # Pegar token descriptografado do veículo
+            self.token = self.recVehToken(self.conn, self.box)
+            if self.token is None:
+                TCP.print(f"[!] Token inválido de {self.addr}. Desconectando...")
+                raise AuthError("Token inválido.")
+            self.conn.sendall(TCP.R_TK)
+
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            TCP.print(f"[!] Desligando veículo {self.token or "não identificado"}...")
+            self.conn.close()
+
+    def handleVehicle(self, connection, address):
         try:
-            # Chave publica do cliente
-            CLIENTE_PUB_KEY = self.recCliPubKey(conn)
-            if CLIENTE_PUB_KEY is None:
-                self.print(f"[!] Chave pública inválida de {addr}. Desconectando...")
-                conn.close()
-                return
-            conn.sendall(TCP.R_PK)
-            BOX = Box(TCP.SERVER_PRIVATE, CLIENTE_PUB_KEY)
+            with TCP.ConnVehicle(connection, address) as v:
+                self.print(f"[$] Chave pública recebida de {v.addr}: {v.pub_key.encode().hex()}")
+                self.print(f"[$] Token recebido de {v.addr}: '{v.token}'")
 
+                #todo: verificar se esse token é valido no banco
 
-            # Pegar token descriptografado do cliente
-            CLIENTE_TK = self.recCliToken(conn, BOX)
-            if CLIENTE_TK is None:
-                self.print(f"[!] Token inválido de {addr}. Desconectando...")
-                conn.close()
-                return
-            conn.sendall(TCP.R_TK)
+                while True:
+                    # Espera por latitude e longitude
+                    DATA = v.conn.recv(1024)
+                    if not DATA:
+                        self.print(f"{v.token} Data vazia.")
+                        return
+                    
+                    lat, lng = None, None
 
+                    try: # Desencripta e separa
+                        DATA_DECRYPTED = v.box.decrypt(DATA)
+                        if len(DATA_DECRYPTED) != 8:
+                            self.print(f"[!] Pacote decifrado inválido ({len(DATA_DECRYPTED)} bytes)")
+                            continue
+                        lat, lng = struct.unpack('<ff', DATA_DECRYPTED)
+                    except Exception as e:
+                        self.print(f"[!] Erro ao decifrar pacote: {e}")
+                        self.print(f"[?] Pacote: {DATA.hex()}")
+                        break
 
-            self.print(f"[$] Chave pública recebida de {addr}: {CLIENTE_PUB_KEY.encode().hex()}")
-            self.print(f"[$] Token recebido de {addr}: '{CLIENTE_TK}'")
-
-            while True:
-                # Espera por latitude e longitude
-                DATA = conn.recv(1024)
-                if not DATA:
-                    self.print(f"Cliente {addr} desconectou.")
-                    break
-
-                try:
-                    # Desencripta e separa
-                    DATA_DECRYPTED = BOX.decrypt(DATA)
-                    if len(DATA_DECRYPTED) != 8:
-                        self.print(f"[!] Pacote decifrado inválido ({len(DATA_DECRYPTED)} bytes)")
-                        continue
-
-                    lat, lng = struct.unpack('<ff', DATA_DECRYPTED)
-
-                    conn.sendall(TCP.R_OK)
-                    self.print(f"-----------\n{addr} {len(DATA)} bytes\n|→ Latitude: {lat:.6f}\n|→ Longitude: {lng:.6f}\n|→ Token: '{CLIENTE_TK}'\n-----------")
+                    v.conn.sendall(TCP.R_OK)
+                    self.print(f"[v] {v.token} {len(DATA)}bytes LAT:{lat:.6f} LNG:{lng:.6f}")
                     # Envia nova localização para o WebSocket
-                    WSS.FILA_THREAD_NEW_LOC.put(VehLocation(CLIENTE_TK, lat, lng))
+                    WSS.FILA_THREAD_NEW_LOC.put(VehLocation(v.token, lat, lng))
 
-                except Exception as e:
-                    self.print(f"[!] Erro ao decifrar pacote: {e}")
-                    self.print(f"[?] Pacote: {DATA.hex()}")
-                    break
-
+        except AuthError as e:
+            self.print(f"[!] Erro de autenticação: {e}")
+        except (ConnectionResetError, BrokenPipeError):
+            self.print(f"[!] Conexão perdida")
         except Exception as e:
             self.print(f"[Erro] {e}")
-            time.sleep(2)
-        finally:
-            conn.close()
 
     def start(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -131,9 +149,10 @@ class TCP:
             self.print(f"Servidor TCP escutando em {self.host}:{self.port}...")
 
             while True:
+                time.sleep(0.2) # Evitar sobrecarga
                 try:
                     conn, addr = s.accept()
-                    threading.Thread(target=self.handleClient, args=(conn, addr), daemon=True).start()
+                    threading.Thread(target=self.handleVehicle, args=(conn, addr), daemon=True).start()
                 except Exception as e:
                     self.print(f"[Falha ao iniciar thread]: {e}")
                     break
@@ -167,18 +186,18 @@ class WSS:
         print(f"[WSS]{msg}")
 
 
-
-
-
-
     async def sendNewLocToCLients(self, vl, cli_ws):
-        await cli_ws.send(f"Nova localização de {vl.veh}: {vl.lat}, {vl.lng}")
+        try:
+            await cli_ws.send(f"Nova localização de {vl.veh}: {vl.lat}, {vl.lng}")
+        except websockets.ConnectionClosed:
+            self.print(f"[!] Tentou se comunicar com {cli_ws.remote_address} mas a conexão estava encerrada.")
 
     def processNewLocation(self):
         self.print("[+] Iniciando processamento de novas localizações...")
         
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        threading.Thread(target=loop.run_forever, daemon=True).start()
 
         while True:
             try:
@@ -193,57 +212,90 @@ class WSS:
                 if new_loc.veh in WSS.VEHICLES:
                     for cid in WSS.VEHICLES[new_loc.veh]:
                         if cid in WSS.CLIENTS:
-                            self.print(f"[+] Enviando localização para cliente {cid}: {new_loc.lat}, {new_loc.lng}")
-                            loop.run_until_complete(self.sendNewLocToCLients(new_loc, WSS.CLIENTS[cid]))
+                            self.print(f"[+] Enviando localização para cliente {cid}")
+                            loop.call_soon_threadsafe(
+                                asyncio.create_task,
+                                self.sendNewLocToCLients(new_loc, WSS.CLIENTS[cid].ws)
+                            )
+                            time.sleep(0.2)
             except queue.Empty:
-                threading.sleep(0.1)
+                time.sleep(0.1)
 
+    class ConnClient:
 
-    async def handleClient(self, ws):
-        self.print(f"[+] Cliente conectado: {ws.remote_address}")
-        CID = WSS.getNextID()
-        WSS.CLIENTS[CID] = ws
-
-
-        # Autenticação do cliente
-        try:
+        async def getClientIdent(self, ws):
             async for message in ws:
-                self.print(f"[@] Mensagem recebida de {ws.remote_address}: {message}")
+                WSS.print(f"[@] Mensagem recebida de {ws.remote_address}: {message}")
                 if message.startswith("ident:"):
                     user_token = message[6:].strip()
                     #todo: verifica se é um cliente válido
                     if user_token:
-                        await ws.send(f"Cliente {CID} autenticado com token: {user_token}")
-                        break
+                        await ws.send(f"Cliente autenticado com token: {user_token}")
+                        return user_token
                     else:
                         await ws.send("[!] Token inválido.")
-                        ws.close()
-                        return
+                        return None
                 await ws.send("Envie 'ident:<token>' para autenticar.")
+            return None
 
-        except websockets.ConnectionClosed:
-            self.print(f"[!] Conexão encerrada: {ws.remote_address}")
-        except Exception as e:
-            self.print("[Erro]", e)
+        def __init__(self, ws):
+            self.ws = ws
+            self.identidade = None
+            self.CID = WSS.getNextID()
 
+        async def __aenter__(self):
+            WSS.print(f"[+] Cliente conectado: {self.ws.remote_address}")
+            clientIdent_task = asyncio.create_task(self.getClientIdent(self.ws))
+            try:
+                self.identidade = await asyncio.wait_for(clientIdent_task, timeout=5.0)
+            except asyncio.TimeoutError:
+                self.identidade = None
+            #todo: verifica no banco
+            if not self.identidade:
+                WSS.print(f"[!] Cliente {self.CID} falhou na autenticação.")
+                raise AuthError("Cliente não autenticado.")
 
-        # Trata as requisições do cliente
+            await self.ws.send(f"Cliente {self.CID} autenticado com identidade: {self.identidade}")
+            WSS.CLIENTS[self.CID] = self
+
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            await self.ws.close()
+            if self.CID in WSS.CLIENTS:
+                WSS.print(f"[!] Desligando cliente {self.CID}...")
+                del WSS.CLIENTS[self.CID]
+            for veh_id in WSS.VEHICLES:
+                if self.CID in WSS.VEHICLES[veh_id]:
+                    WSS.print(f"[!] tirando o cliente {self.CID} do veiculo {veh_id}")
+                    WSS.VEHICLES[veh_id].discard(self.CID)
+
+    async def handleClient(self, websocket):
         try:
-            async for message in ws:
-                self.print(f"[$] Mensagem recebida de {ws.remote_address}: {message}")
-                if message.startswith("veh:"):
-                    #todo: verificar se o veiculo existe no banco antes
-                    veh_id = message[4:].strip()
-                    if veh_id not in WSS.VEHICLES:
-                        WSS.VEHICLES[veh_id] = set()
-                    WSS.VEHICLES[veh_id].add(CID)
-                    await ws.send(f"Agora você está rastreando o veículo {veh_id}.")
-
+            async with WSS.ConnClient(websocket) as c:
+                # Requisições do cliente
+                async for message in c.ws:
+                    self.print(f"[$] Mensagem recebida de {c.identidade}: {message}")
+                    if message.startswith("va:"):
+                        #todo: verificar se o veiculo existe no banco antes, (e se ele pode ser rastreado)
+                        veh_id = message[3:].strip()
+                        if veh_id not in WSS.VEHICLES:
+                            WSS.VEHICLES[veh_id] = set()
+                        WSS.VEHICLES[veh_id].add(c.CID)
+                        await c.ws.send(f"Agora você está rastreando o veículo {veh_id}.")
+                    elif message.startswith("vr:"):
+                        veh_id = message[3:].strip()
+                        if veh_id in WSS.VEHICLES and c.CID in WSS.VEHICLES[veh_id]:
+                            WSS.VEHICLES[veh_id].remove(c.CID)
+                            await c.ws.send(f"Você parou de rastrear o veículo {veh_id}.")
+                        else:
+                            await c.ws.send(f"[!] Você não está rastreando o veículo {veh_id}.")
+        except AuthError as e:
+            self.print(f"[!] {e}")
         except websockets.ConnectionClosed:
-            self.print(f"[!] Conexão encerrada: {ws.remote_address}")
+            self.print(f"[!] Conexão encerrada")
         except Exception as e:
-            self.print("[Erro]", e)
-
+            self.print(f"[Erro] {e}")
 
 
     async def start_(self):
