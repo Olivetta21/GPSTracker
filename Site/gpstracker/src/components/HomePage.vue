@@ -5,7 +5,7 @@
             <div id="map-cont" class="panels-shadow">
                 <template v-if="mfltop">
                     <span class="button-a" @click="mfltop = !mfltop"> &#10799; </span>
-                    <select v-if="Home.veiculo.get().length > 0" v-model="Home.veiculo.selected" @change="Home.veiculo.r_atualizar()">
+                    <select v-if="Home.veiculo.get().length > 0" v-model="Home.veiculo.selected" @change="Home.veiculo.r_atualizar(); Home.veiculo.ws_watchVeh();">
                         <option v-for="(v, index) in Home.veiculo.get()" :key="v.id" :value="index">{{ v.nome }}</option>
                     </select>
                     <span v-else class="button-b" @click="$router.push({ name: 'criar-veiculo' })"> + Adicionar Veículo </span>
@@ -31,9 +31,9 @@
 <script>
 import { formatDate } from '../scripts/utils';
 import Gmaps from '../scripts/mapa/Gmaps';
+import WsTracks from '../scripts/mapa/WsTracks';
 import Home from '../scripts/telas/home/Home';
 import CadastrosVeiculos from '../scripts/telas/veiculos/CadastrosVeiculos';
-
 
 
 export default {
@@ -48,7 +48,11 @@ export default {
     },
     mounted() {
         Gmaps.init(document.getElementById("google-map"));
-    }
+        WsTracks.setupSrv();
+    },
+    beforeUnmount() {
+        WsTracks.stop();
+    },
 
     //
     //mounted() {

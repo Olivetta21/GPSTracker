@@ -2,6 +2,7 @@ import { ref } from "vue";
 import Janela from "../Janela";
 import CadastrosVeiculos from "../veiculos/CadastrosVeiculos";
 import Gmaps from "@/scripts/mapa/Gmaps";
+import WsTracks from "@/scripts/mapa/WsTracks";
 import { formatDate } from "@/scripts/utils";
 
 class Home extends Janela {
@@ -79,6 +80,14 @@ class Home extends Janela {
         r_getData() {
             return this.r_idx_act !== null ? this.r_get()[this.r_idx_act]?.data : null;
         },
+
+
+        ws_watchVeh() {
+            const codigo = this.pick()?.codigo_rastreamento;
+            if (codigo) {
+                WsTracks.watchVeiculo(codigo);
+            }
+        }
 
     })
 

@@ -230,7 +230,6 @@ class WSS:
                     user_token = message[6:].strip()
                     #todo: verifica se é um cliente válido
                     if user_token:
-                        await ws.send(f"Cliente autenticado com token: {user_token}")
                         return user_token
                     else:
                         await ws.send("[!] Token inválido.")
