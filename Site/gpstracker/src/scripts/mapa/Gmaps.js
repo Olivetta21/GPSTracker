@@ -12,7 +12,7 @@ class Gmaps {
             return;
         }
         this.map = new google.maps.Map(element, {
-            zoom: 12,
+            zoom: 2,
             center: { lat: -34.397, lng: 150.644 },
         });
         console.log("Map initialized");

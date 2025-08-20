@@ -4,6 +4,12 @@ import threading
 import queue
 from time import sleep
 
+addr = 'localhost'
+port = 12344
+
+addr = input(f"Endereço[{addr}]: ") or addr
+port = input(f"Porta[{port}]: ") or port
+
 # Fila para comunicação entre threads
 fila_envio = queue.Queue()
 print_lock = threading.Lock()  # Lock para sincronizar prints
@@ -13,8 +19,8 @@ def thread_segura_print(mensagem):
         print(mensagem)
 
 async def cliente_ws():
-    uri = "ws://localhost:12344"  # ou IP externo do servidor
-    
+    uri = f"ws://{addr}:{port}"  # ou IP externo do servidor
+
     try:
         async with websockets.connect(uri) as websocket:
             thread_segura_print("Conectado ao servidor WebSocket")
