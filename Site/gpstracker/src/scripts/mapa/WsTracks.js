@@ -1,5 +1,5 @@
-import Home from "../telas/home/Home";
-import CadastrosVeiculos from "../telas/veiculos/CadastrosVeiculos";
+import MapTrackers from "../telas/map/MapTrackers";
+import TrackersRegister, { Track } from "../telas/trackersregister/TrackersRegister";
 import { formatDate } from "../utils"; 
 
 const wsUrl = "ws://localhost:12344";
@@ -31,6 +31,7 @@ class WsTracks {
     static wsOnOpen() {
         console.log("WebSocket conectado");
         this.ws.send("ident:test");
+        this.watchVeiculoUnique("AB");
     }
 
     static wsOnClose() {
@@ -53,15 +54,15 @@ class WsTracks {
                 const id = this.tmp++;
                 const lat = msg.lat;
                 const lng = msg.lng;
-                const data = formatDate(new Date(), 'date') + ' ' + formatDate(new Date(), 'time') + '-04';
+                const date = formatDate(new Date(), 'date') + ' ' + formatDate(new Date(), 'time') + '-04';
 
-                CadastrosVeiculos.veiculos.forEach(veiculo => {
-                    if (veiculo.codigo_rastreamento === msg.tk) {
-                        veiculo.rastreios.push({ id, lat, lng, data });
+                TrackersRegister.trackers.forEach(tracker => {
+                    if (tracker.token === msg.tk) {
+                        tracker.tracks.push(new Track(id, date, lat, lng));
+                        MapTrackers.updateTrail();
                     }
                 });
-                
-                Home.veiculo.r_atualizar();
+                break;
             }
         }
     }

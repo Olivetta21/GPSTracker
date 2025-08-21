@@ -2,109 +2,32 @@
     <div id="map-page">
         <div id="google-map"></div>
         <div id="map-content">
-            <div v-if="isTracking" id="rastr-tracking" class="rastr">
+            <div v-if="MT.tConfig.idx >= 0" id="rastr-tracking" class="rastr">
                 <div id="track-info">
-                    <input type="date">
-                    <input type="date">
-                    <p> Rastr 1 </p>
+                    <button @click="MT.updateTrail()">Test</button>
+                    <input type="date" v-model="MT.tConfig.dateIn" @change="MT.updateTrail()">
+                    <input type="date" v-model="MT.tConfig.dateFi" @change="MT.updateTrail()">
+                    <p @click="MT.clearTracker()">{{ MT.tracker.name }}</p>
                     <div id="tracks-change">
-                        <p>&leftarrow;</p>
-                        <p>&dot;</p>
-                        <p>&rightarrow;</p>
+                        <button @click="MT.prevTrailPoint()">&leftarrow;</button>
+                        <button @click="MT.lastTrailPoint()">&dot;</button>
+                        <button @click="MT.nextTrailPoint()">&rightarrow;</button>
                     </div>
                 </div>
                 <div id="track-list">
                     <table>
                         <tbody>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
-                            </tr>
-                            <tr>
-                                <td>2025-01-01</td>
-                                <td>Rastr 1</td>
-                                <td>Rastr 2</td>
+                            <tr v-for="(t, idx) in MT.tracker.tracksFiltered" :key="idx" :class="['track-item', { 'active': MT.tConfig.trackIdx === idx }]" @click="MT.setTrailPoint(idx)">
+                                <td>{{ t.date }}</td>
+                                <td>{{ t.pos.lat }}</td>
+                                <td>{{ t.pos.lng }}</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
             <div v-else id="rastr-select" class="rastr">
-                <p> Rastr 1 </p>
-                <p> Rastr 1 </p>
-                <p> Rastr 1 </p>
-                <p> Rastr 1 </p>
+                <p v-for="(t, idx) in TR.trackers" :key="idx" @click="MT.setTracker(idx, t.id)"> {{ t.name }}</p>
             </div>
         </div>
     </div>
@@ -112,19 +35,17 @@
 
 
 <script>
-import { formatDate } from '../scripts/utils';
+import TrackersRegister from '../scripts/telas/trackersregister/TrackersRegister';
 import Gmaps from '../scripts/mapa/Gmaps';
 import WsTracks from '../scripts/mapa/WsTracks';
-import Home from '../scripts/telas/home/Home';
+import MapTrackers from '../scripts/telas/map/MapTrackers';
 
 
 export default {
     data() {
         return {
-            Home,
-            formatDate,
-
-            isTracking: true,
+            MT: MapTrackers,
+            TR: TrackersRegister
         };
     },
     mounted() {
@@ -207,6 +128,11 @@ export default {
 }
 #track-list>table>tbody>tr:hover {
     background-color: rgb(177, 177, 177);
+}
+
+.track-item.active {
+    background-color: rgb(49, 49, 49);
+    color: white;
 }
 
 </style>

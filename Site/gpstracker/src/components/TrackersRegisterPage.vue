@@ -44,10 +44,10 @@
             </template>
             <template v-else>
                 <p>Token: {{ TC.Adding.token }}</p>
-                <input type="text" placeholder="Nome do Rastreador" v-model="TC.Adding.nome">
-                <p>Dono: {{ TC.Adding.dono || "Você" }}</p>
-                <p v-if="TC.Adding.dono"> Esse token já tem dono, confirme para enviar uma solicitação. </p>
-                <input v-else type="text" placeholder="senha" v-model="TC.Adding.senha">
+                <input type="text" placeholder="Nome do Rastreador" v-model="TC.Adding.name">
+                <p>Dono: {{ TC.Adding.owner || "Você" }}</p>
+                <p v-if="TC.Adding.owner"> Esse token já tem dono, confirme para enviar uma solicitação. </p>
+                <input v-else type="text" placeholder="senha" v-model="TC.Adding.password">
                 <button >confirmar</button>
             </template>
         </ModalBase>
@@ -56,26 +56,18 @@
                 <input type="text">
                 <p>Pesq</p>
                 <p>Reca</p>
-                <p>Adic</p>
+                <p @click="TC.testAddTracker()">Adic</p>
             </div>
             <div id="trackers-table">
                 <table>
                     <tbody>
-                        <tr>
+                        <tr v-for="t in TC.trackers" :key="t.id">
                             <td> <div class="color-state g"></div> </td>
-                            <td> Carro1 </td>
-                            <td> XXXXXXXXXX </td>
-                            <td> Rastr </td>
-                            <td> Usrs </td>
-                            <td> Excl </td>
-                        </tr>
-                        <tr>
-                            <td> <div class="color-state r"></div> </td>
-                            <td> Carro2 </td>
-                            <td> XXXXXXXXXX </td>
-                            <td> Rastr </td>
-                            <td> Usrs </td>
-                            <td> Excl </td>
+                            <td> {{ t.nome }} </td>
+                            <td> {{ t.token }} </td>
+                            <td> Rastrear </td>
+                            <td> usuarios </td>
+                            <td> Exluir </td>
                         </tr>
                     </tbody>
                 </table>

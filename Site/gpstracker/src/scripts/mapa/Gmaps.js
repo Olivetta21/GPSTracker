@@ -18,13 +18,17 @@ class Gmaps {
         console.log("Map initialized");
     }
 
-    static setCenter(lat, lng) {
+    static setMarkerPosition(lat, lng) {
+        if (this.marker) {
+            this.marker.setPosition(new google.maps.LatLng(lat, lng));
+        }
+    }
+
+    static centerOn(lat, lng) {
         if (this.map) {
             let pos = new google.maps.LatLng(lat, lng);
             this.map.panTo(pos);
-            if (this.marker) {
-                this.marker.setPosition(pos);
-            }
+            this.setMarkerPosition(lat, lng);
         } else {
             console.error("Map not initialized");
         }
@@ -42,7 +46,6 @@ class Gmaps {
 
         if (this.marker === null) {
             this.marker = new google.maps.Marker({
-                position: coords[coords.length - 1],
                 map: this.map,
                 icon: {
                 path: google.maps.SymbolPath.CIRCLE,
@@ -52,8 +55,6 @@ class Gmaps {
                 strokeWeight: 0
                 }
             });
-        } else {
-            this.marker.setPosition(coords[coords.length - 1]);
         }
 
         if (this.line === null) {
