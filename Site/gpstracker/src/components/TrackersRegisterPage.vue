@@ -1,6 +1,6 @@
 <template>
     <div id="tracker-page">
-        <ModalBase v-if="editingUsers" id="editing-users" @close="editingUsers = false">
+        <ModalBase v-if="TC.EditUser.cfg.state" id="editing-users" @close="TC.EditUser.stop()">
             <div>
                 <input type="text">
                 <p>Pesq</p>
@@ -9,46 +9,30 @@
             <div id="editing-users-table">
                 <table>
                     <tbody>
-                        <tr>
+                        <tr v-for="(u, idx) in TC.EditUser.cfg.users" :key="idx">
                             <td><div class="color-state g"></div></td>
-                            <td> Ivan </td>
+                            <td> {{ u.name }} </td>
                             <td>
-                                <button> Pausar </button>
-                                <button> Deletar </button>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td><div class="color-state o"></div></td>
-                            <td> kelvin </td>
-                            <td>
-                                <button> Iniciar </button>
-                                <button> Deletar </button>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td><div class="color-state r"></div></td>
-                            <td> kaio </td>
-                            <td>
-                                <button> Aprovar </button>
-                                <button> Deletar </button>
+                                <button @click="TC.EditUser.pauseUser(idx, u.id)"> Pausar </button>
+                                <button @click="TC.EditUser.deleteUser(idx, u.id)"> Deletar </button>
                             </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </ModalBase>
-        <ModalBase v-if="addingTracker" id="adding-tracker" @close="addingTracker = false">
-            <template v-if="!TC.Adding.tokenFound">
-                <input type="text" placeholder="token" v-model="TC.Adding.token">
-                <button @click="TC.Adding.tokenFound = true" > Procurar </button>
+        <ModalBase v-if="TC.AddTracker.cfg.state" id="adding-tracker" @close="TC.AddTracker.stop()">
+            <template v-if="!TC.AddTracker.cfg.tokenFound">
+                <input type="text" placeholder="token" v-model="TC.AddTracker.cfg.token">
+                <button @click="TC.AddTracker.find()" > Procurar </button>
             </template>
             <template v-else>
-                <p>Token: {{ TC.Adding.token }}</p>
-                <input type="text" placeholder="Nome do Rastreador" v-model="TC.Adding.name">
-                <p>Dono: {{ TC.Adding.owner || "Você" }}</p>
-                <p v-if="TC.Adding.owner"> Esse token já tem dono, confirme para enviar uma solicitação. </p>
-                <input v-else type="text" placeholder="senha" v-model="TC.Adding.password">
-                <button >confirmar</button>
+                <p>Token: {{ TC.AddTracker.cfg.token }}</p>
+                <input type="text" placeholder="Nome do Rastreador" v-model="TC.AddTracker.cfg.name">
+                <p>Dono: {{ TC.AddTracker.cfg.owner || "Você" }}</p>
+                <p v-if="TC.AddTracker.cfg.owner"> Esse token já tem dono, confirme para enviar uma solicitação. </p>
+                <input v-else type="text" placeholder="senha" v-model="TC.AddTracker.cfg.password">
+                <button @click="TC.AddTracker.confirm()">confirmar</button>
             </template>
         </ModalBase>
         <div id="trackers-container">
@@ -56,18 +40,18 @@
                 <input type="text">
                 <p>Pesq</p>
                 <p>Reca</p>
-                <p @click="TC.testAddTracker()">Adic</p>
+                <p @click="TC.AddTracker.start()">Adic</p>
             </div>
             <div id="trackers-table">
                 <table>
                     <tbody>
-                        <tr v-for="t in TC.trackers" :key="t.id">
-                            <td> <div class="color-state g"></div> </td>
-                            <td> {{ t.nome }} </td>
+                        <tr v-for="(t, idx) in TC.trackers" :key="idx">
+                            <td> <div :class="['color-state', t.state]"></div> </td>
+                            <td> {{ t.name }} </td>
                             <td> {{ t.token }} </td>
                             <td> Rastrear </td>
-                            <td> usuarios </td>
-                            <td> Exluir </td>
+                            <td> <button @click="TC.EditUser.start(idx, t.id)"> Usuarios </button> <button @click="TC.EditUser.mockUser(idx, t.id)"> mock </button></td>
+                            <td> <button @click="TC.delTracker(idx, t.id)"> Excluir </button> </td>
                         </tr>
                     </tbody>
                 </table>
@@ -86,7 +70,6 @@ export default {
     data() {
         return {
             editingUsers: true,
-            addingTracker: true,
 
             TC: TrackersRegister
         };

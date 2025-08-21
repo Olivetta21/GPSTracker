@@ -27,7 +27,7 @@
                 </div>
             </div>
             <div v-else id="rastr-select" class="rastr">
-                <p v-for="(t, idx) in TR.trackers" :key="idx" @click="MT.setTracker(idx, t.id)"> {{ t.name }}</p>
+                <p v-for="(t, idx) in TR.trackers" :key="idx" @click="MT.setTracker(idx, t.id)">{{ t.id }} - {{ t.name }}</p>
             </div>
         </div>
     </div>
@@ -92,6 +92,7 @@ export default {
     width: 90%;
     height: 25%;
     pointer-events: all;
+    overflow: auto;
 }
 
 #rastr-select>p {
