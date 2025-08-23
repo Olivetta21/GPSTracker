@@ -184,6 +184,7 @@ class TCP:
                     break
         
         TCP.log("\n[-] Servidor encerrado.")
+        ProgramError.set("Servidor TCP encerrado")
 
 
 
@@ -305,6 +306,8 @@ class WSS:
                     time.sleep(0.2)
             except queue.Empty:
                 time.sleep(0.1)
+            except:
+                ProgramError.set("Process new location")
 
     class ConnClient:
         serial_id = 0
@@ -398,6 +401,7 @@ class WSS:
 
         await SRV.wait_closed()
         WSS.log("[-] Servidor encerrado.")
+        ProgramError.set("Servidor WSS encerrado.")
 
     def start(self):
         asyncio.run(self.start_())
@@ -406,14 +410,40 @@ class WSS:
 
 MESSAGES_LOG = queue.Queue()
 def log_service():
-    while True:
-        msg = MESSAGES_LOG.get()
-        if msg is None:
-            continue
-        print(f"{datetime.now()}|{msg}")
+    try:
+        while True:
+            msg = MESSAGES_LOG.get()
+            if msg is None:
+                continue
+            print(f"{datetime.now()}|{msg}")
+    finally:
+        ProgramError.set("Log service")
+
+
+
+class ProgramError:
+    withError = False
+    msg = []
+    lock = threading.Lock()
+    @staticmethod
+    def set(msg):
+        with ProgramError.lock:
+            ProgramError.withError = True
+            ProgramError.msg.append(msg)
+    @staticmethod
+    def test():
+        with ProgramError.lock:
+            return ProgramError.withError, ProgramError.msg
 
 if __name__ == "__main__":
     threading.Thread(target=log_service, daemon=True).start()
     threading.Thread(target=WSS().start, daemon=True).start()
-    TCP().start()
-    
+    threading.Thread(target=TCP().start, daemon=True).start()
+
+    while not ProgramError.test()[0]:
+        try:
+            time.sleep(0.5)
+        except:
+            ProgramError.set("Main thread interrupted")
+
+    print(f"[ProgramError]{ProgramError.test()[1]}")
