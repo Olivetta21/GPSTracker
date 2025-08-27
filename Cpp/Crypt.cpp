@@ -21,19 +21,50 @@ typedef uint8_t byte;
 #define IV_SIZE 4
 #define BUFFER_SIZE 64
 #define CHECKSUM_SIZE 2
+#define ROUNDS 2
 
 class Crypt {
     private:
-    byte key[KEY_SIZE];
+    byte keys[ROUNDS][KEY_SIZE];
 
     /**
-     * @brief Encrypt or decrypt a single byte.
-     * @param byte Byte to encrypt or decrypt.
-     * @return The encrypted or decrypted byte.
-     * @note This function does not care about the result. Good luck!
-     *
+     * @brief Generate subkeys for encryption and decryption.
+     * @note Runs only at initialization, immediately after key set.
+     * 
      */
-    byte enc_dec_byte(byte byte);
+    void generateSubkeys();
+
+    /**
+     * @brief Encode a single byte.
+     * @param byte_ The byte to encode.
+     * @param key The key to use for encoding.
+     * @param mod The mode to use for encoding.
+     * @return The encoded byte.
+     * 
+     */
+    byte encodeByte(byte byte_, byte key, byte mod);
+
+    /**
+     * @brief Decode a single byte.
+     * @param byte_ The byte to decode.
+     * @param key The key to use for decoding.
+     * @param mod The mode to use for decoding.
+     * @return The decoded byte.
+     * 
+     */
+    byte decodeByte(byte byte_, byte key, byte mod);
+
+    
+    /**
+     * @brief Encrypt or decrypt an array of bytes.
+     * @param data Pointer to the array to be encrypted or decrypted.
+     * @param size Size of the array.
+     * @param round Round number.
+     * @param operation Pointer to the encryption or decryption function.
+     * @note This function does not care about the result. Good luck!
+     * 
+     */
+    void enc_dec_byteArray(byte* data, byte size, byte round, byte (Crypt::*operation)(byte, byte, byte));
 
     /**
      * @brief Generate and insert an IV in the beginning of the array.
@@ -68,6 +99,7 @@ class Crypt {
      * @brief Create Crypt object.
      * @param key Pointer to key array.
      * @param size Size of the key array.
+     * @note Insert the key into the [0] of the keys, it will be used to generate subkeys.
      *
      */
     Crypt(const byte* key, const byte size);
@@ -91,9 +123,59 @@ class Crypt {
     byte decrypt(byte* data, byte size);
 };
 
-byte Crypt::enc_dec_byte(byte byte) {
-    byte ^= key[0];
-    return byte;
+void Crypt::generateSubkeys() {    
+    for (byte i = 1; i < ROUNDS; i++) {
+        for (byte j = 0; j < KEY_SIZE; j++) {
+            byte prevByte = keys[i-1][j];
+            
+            keys[i][j] = ((prevByte << 3) | (prevByte >> 5)) ^ (j + i * 7);
+        }
+    }
+}
+
+byte Crypt::encodeByte(byte byte_, byte key, byte mod) {
+	switch (mod) {
+		case 0:
+			// XOR
+			byte_ ^= key;
+			break;
+		case 1:
+			// Addition
+			byte_ += key;
+			break;
+		default:
+			// Substitution + XOR
+			byte_ = ((byte_ << 4) | (byte_ >> 4)) ^ key;
+	}
+	return byte_;
+}
+
+byte Crypt::decodeByte(byte byte_, byte key, byte mod) {
+	switch (mod) {
+		case 0:
+			// XOR
+			byte_ ^= key;
+			break;
+		case 1:
+			// Subtraction
+			byte_ -= key;
+			break;
+		default:
+			// XOR + inverse substitution
+			byte temp = byte_ ^ key;
+			byte_ = (temp >> 4) | (temp << 4);
+	}
+	return byte_;
+}
+
+void Crypt::enc_dec_byteArray(byte* data, byte size, byte round, byte (Crypt::*operation)(byte, byte, byte)) {
+    for (byte i = 0; i < size; i++) {
+        data[i] = (this->*operation)(
+            data[i],
+            keys[round][i % KEY_SIZE],
+            ((i + round) % 3)
+        );
+    }
 }
 
 byte Crypt::genAndInsertIV(byte* data, byte size) {
@@ -153,27 +235,23 @@ byte Crypt::testAndRemoveChecksum(byte* data, byte size) {
 }
 
 Crypt::Crypt(const byte* key, const byte size) {
-    #ifdef ISDEBUG
-        if (size != KEY_SIZE) {
-            print(F("Wrong key size"));
-        }
-    #endif
-    memcpy(this->key, key, KEY_SIZE);
+    memcpy(keys[0], key, KEY_SIZE);
+    generateSubkeys();
 }
 
 byte Crypt::encrypt(byte* data, byte size) {
     size = genAndInsertIV(data, size);
     size = genAndInsertChecksum(data, size);
-    for (byte i = 0; i < size; i++){
-        data[i] = enc_dec_byte(data[i]);
-    }
+	for (byte round = 0; round < ROUNDS; round++) {
+        enc_dec_byteArray(data, size, round, &Crypt::encodeByte);
+	}
     return size;
 }
 
 byte Crypt::decrypt(byte* data, byte size) {
-    for (byte i = 0; i < size; i++){
-        data[i] = enc_dec_byte(data[i]);
-    }
+	for (byte round = ROUNDS; round-- > 0;) {
+        enc_dec_byteArray(data, size, round, &Crypt::decodeByte);
+	}
     size = testAndRemoveChecksum(data, size);
     memcpy(data, data + IV_SIZE, size);
 
@@ -198,12 +276,9 @@ void printBytes(const byte* data, byte size) {
     std::cout << std::endl;
 }
 
-int main()
-{
-    const byte masterKey[] PROGMEM = {0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01};
-    Crypt crypt(masterKey, sizeof(masterKey));
 
-    byte data[BUFFER_SIZE] = {0x01, 0x04, 0xFF, 0x01, 0x04, 0xFF,0x01, 0x04, 0xFF};
+void testGens(Crypt& crypt) {
+    byte data[BUFFER_SIZE] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
     byte dataSize = 9;
     std::cout << "Original data: ";
     printBytes(data, dataSize);
@@ -215,6 +290,30 @@ int main()
     byte decryptedSize = crypt.decrypt(data, encryptedSize);
     std::cout << "Decrypted data: ";
     printBytes(data, decryptedSize);
+
+    std::cout << "\n\n\n";
+}
+
+int main()
+{
+    const byte masterKey[] PROGMEM = {0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01};
+    Crypt crypt(masterKey, sizeof(masterKey));
+
+    for (byte i = 0; i < 10; i++) {
+        testGens(crypt);
+    }
+
+    byte otherEncrypted[15] = {0};
+    const int otherValues[] = {40, 41, 56, 168, 156, 143, 94, 86, 101, 125, 204, 87, 240, 134, 173};
+    for (byte i = 0; i < sizeof(otherEncrypted); i++) {
+        otherEncrypted[i] = (byte) otherValues[i];
+    }
+
+    std::cout << "\nOther Encrypted data: ";
+    printBytes(otherEncrypted, sizeof(otherEncrypted));
+    byte decryptedSize = crypt.decrypt(otherEncrypted, sizeof(otherEncrypted));
+    std::cout << "Other decrypted data: ";
+    printBytes(otherEncrypted, decryptedSize);
 
     return 0;
 }
