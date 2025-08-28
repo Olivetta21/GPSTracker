@@ -31,8 +31,7 @@ class Crypt {
 
     /**
      * @brief Generate subkeys for encryption and decryption.
-     * @note Runs only at initialization, immediately after key set.
-     * 
+     *
      */
     void generateSubkeys();
 
@@ -42,7 +41,7 @@ class Crypt {
      * @param key The key to use for encoding.
      * @param mod The mode to use for encoding.
      * @return The encoded byte.
-     * 
+     *
      */
     byte encodeByte(byte byte_, byte key, byte mod);
 
@@ -52,11 +51,11 @@ class Crypt {
      * @param key The key to use for decoding.
      * @param mod The mode to use for decoding.
      * @return The decoded byte.
-     * 
+     *
      */
     byte decodeByte(byte byte_, byte key, byte mod);
 
-    
+
     /**
      * @brief Encrypt or decrypt an array of bytes.
      * @param data Pointer to the array to be encrypted or decrypted.
@@ -64,7 +63,7 @@ class Crypt {
      * @param round Round number.
      * @param operation Pointer to the encryption or decryption function.
      * @note This function does not care about the result. Good luck!
-     * 
+     *
      */
     void enc_dec_byteArray(byte* data, byte size, byte round, byte (Crypt::*operation)(byte, byte, byte));
 
@@ -91,7 +90,7 @@ class Crypt {
      * @param data Pointer to the array to be obfuscated/deobfuscated.
      * @param size Size of the array.
      * @return The size of data, zero if failed.
-     * 
+     *
      */
     byte de_ob_fuscateWithIV(byte* data, byte size);
 
@@ -105,16 +104,6 @@ class Crypt {
     byte testAndRemoveChecksum(byte* data, byte size);
 
     public:
-
-    /**
-     * @brief Create Crypt object.
-     * @param key Pointer to key array.
-     * @param size Size of the key array.
-     * @note Insert the key into the [0] of the keys, it will be used to generate subkeys.
-     *
-     */
-    Crypt(const byte* key, const byte size);
-
     /**
      *  @brief Encrypt the given data.
      *  @param data Pointer to the array to be encrypted.
@@ -132,13 +121,19 @@ class Crypt {
      *
      */
     byte decrypt(byte* data, byte size);
+
+    /**
+     *  @brief Set the encryption keys.
+     *  @param key Pointer to the key array.
+     *
+     */
+    void setKeys(const byte* key);
 };
 
-void Crypt::generateSubkeys() {    
+void Crypt::generateSubkeys() {
     for (byte i = 1; i < ROUNDS; i++) {
         for (byte j = 0; j < KEY_SIZE; j++) {
             byte prevByte = keys[i-1][j];
-            
             keys[i][j] = ((prevByte << 3) | (prevByte >> 5)) ^ (j + i * 7);
         }
     }
@@ -254,15 +249,15 @@ byte Crypt::testAndRemoveChecksum(byte* data, byte size) {
     return size - CHECKSUM_SIZE;
 }
 
-Crypt::Crypt(const byte* key, const byte size) {
-    memcpy(keys[0], key, KEY_SIZE);
-    generateSubkeys();
-}
-
 byte Crypt::encrypt(byte* data, byte size) {
-    size = genAndInsertIV(data, size);
-    size = genAndInsertChecksum(data, size);
-    size = de_ob_fuscateWithIV(data, size);
+    if (
+        !(size = genAndInsertIV(data, size)) ||
+        !(size = genAndInsertChecksum(data, size)) ||
+        !(size = de_ob_fuscateWithIV(data, size))
+    ) {
+        return 0;
+    }
+
 	for (byte round = 0; round < ROUNDS; round++) {
         enc_dec_byteArray(data, size, round, &Crypt::encodeByte);
 	}
@@ -273,18 +268,21 @@ byte Crypt::decrypt(byte* data, byte size) {
 	for (byte round = ROUNDS; round-- > 0;) {
         enc_dec_byteArray(data, size, round, &Crypt::decodeByte);
 	}
-    size = de_ob_fuscateWithIV(data, size);
-    size = testAndRemoveChecksum(data, size);
+    if (
+        !(size = de_ob_fuscateWithIV(data, size)) ||
+        !(size = testAndRemoveChecksum(data, size)) ||
+        IV_SIZE >= size
+    ) {
+        return 0;
+    }
     memcpy(data, data + IV_SIZE, size);
-
     return size - IV_SIZE;
 }
 
-
-
-
-
-
+void Crypt::setKeys(const byte* key) {
+    memcpy(keys[0], key, KEY_SIZE);
+    generateSubkeys();
+}
 
 
 
@@ -292,8 +290,6 @@ byte Crypt::decrypt(byte* data, byte size) {
 
 
 void printBytes(const byte* data, byte size) {
-    std::cout << "Tamanho: " << (int)size << " | Dados: ";
-
     for (byte i = 0; i < size; i++) {
         std::cout << static_cast<int>(data[i]) << " ";
     }
@@ -301,34 +297,43 @@ void printBytes(const byte* data, byte size) {
 }
 
 
-void testGens(Crypt& crypt) {
+
+bool testGens(Crypt& crypt) {
     byte data[BUFFER_SIZE] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
     byte dataSize = 9;
-    std::cout << "Original data: ";
-    printBytes(data, dataSize);
+    byte enc[BUFFER_SIZE] = {0};
+    byte dec[BUFFER_SIZE] = {0};
 
-    byte encryptedSize = crypt.encrypt(data, dataSize);
+    memcpy(enc, data, dataSize);
+    byte encryptedSize = crypt.encrypt(enc, dataSize);
+    memcpy(dec, enc, encryptedSize);
+    byte decryptedSize = crypt.decrypt(dec, encryptedSize);
+
     std::cout << "Encrypted data: ";
-    printBytes(data, encryptedSize);
+    printBytes(enc, encryptedSize);
 
-    byte decryptedSize = crypt.decrypt(data, encryptedSize);
-    std::cout << "Decrypted data: ";
-    printBytes(data, decryptedSize);
-
-    std::cout << "\n\n\n";
+    for (byte i = 0; i < dataSize; i++) {
+        if (data[i] != dec[i]) {
+            std::cout << "\n\n\nOriginal data: ";
+            printBytes(data, dataSize);
+            std::cout << "Encrypted data: ";
+            printBytes(enc, encryptedSize);
+            std::cout << "Decrypted data: ";
+            printBytes(dec, decryptedSize);
+            return false;
+        }
+    }
+    return true;
 }
 
 int main()
 {
-    const byte masterKey[] PROGMEM = {0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01};
-    Crypt crypt(masterKey, sizeof(masterKey));
+    Crypt crypt;
+    crypt.setKeys((byte[KEY_SIZE]) {0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01});
 
-    for (byte i = 0; i < 2; i++) {
-        testGens(crypt);
-    }
 
     byte otherEncrypted[27] = {0};
-    const int otherValues[] = {23, 174, 139, 8, 237, 230, 107, 116, 27, 189, 88, 98, 97, 31, 63, 55, 241, 127, 187, 203, 172, 193, 114, 229, 222, 11, 215};
+    const int otherValues[] = {104, 141, 136, 254, 253, 128, 196, 9, 14, 27, 1, 153, 92, 230, 172, 178, 166, 28, 235, 173, 93, 155, 232, 121, 175, 5, 188};
     for (byte i = 0; i < sizeof(otherEncrypted); i++) {
         otherEncrypted[i] = (byte) otherValues[i];
     }
@@ -338,6 +343,17 @@ int main()
     byte decryptedSize = crypt.decrypt(otherEncrypted, sizeof(otherEncrypted));
     std::cout << "Other decrypted data: ";
     printBytes(otherEncrypted, decryptedSize);
+
+    std::cout << "\n\n Iniciando testes:\n";
+
+    for (byte i = 0; i < 20000; i++) {
+        if (testGens(crypt)) {
+            std::cout << ".";
+        } else {
+            std::cout << "\n\nfailed!";
+            return 1;
+        }
+    }
 
     return 0;
 }
