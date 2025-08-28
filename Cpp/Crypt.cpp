@@ -1,27 +1,29 @@
-#include <iostream>
-#include <stdint.h>
 
-// Unsigned 8 bits
-typedef uint8_t byte;
+typedef unsigned short b2byte;
 
-//#define ISARDUINO
-#define ISDEBUG
-
-// Put variables in flash if arduino
+/*#define ISARDUINO*/
 #ifdef ISARDUINO
-    #define print(msg) Serial.println(msg)
+    #define RANDOM_INTEGER_FUNCTION random()
 #else
-    #define print(msg) std::cout << msg << std::endl
-    #define F(msg) msg
+    #include <iostream>
+    typedef unsigned char byte;
+    #define RANDOM_INTEGER_FUNCTION std::rand()
     #define PROGMEM
 #endif
 
-
+// Encryption config
 #define KEY_SIZE 16
-#define IV_SIZE 4
-#define BUFFER_SIZE 64
+#define IV_SIZE 16
+#define BUFFER_SIZE 33
 #define CHECKSUM_SIZE 2
 #define ROUNDS 2
+//
+
+// Test
+#if IV_SIZE + CHECKSUM_SIZE >= BUFFER_SIZE
+#error "buffer size too small"
+#endif
+
 
 class Crypt {
     private:
@@ -83,6 +85,15 @@ class Crypt {
      *
      */
     byte genAndInsertChecksum(byte* data, byte size);
+
+    /**
+     * @brief Obfuscate or deobfuscate the data with the IV.
+     * @param data Pointer to the array to be obfuscated/deobfuscated.
+     * @param size Size of the array.
+     * @return The size of data, zero if failed.
+     * 
+     */
+    byte de_ob_fuscateWithIV(byte* data, byte size);
 
     /**
      * @brief Test and remove the checksum from the data.
@@ -187,7 +198,7 @@ byte Crypt::genAndInsertIV(byte* data, byte size) {
     memcpy(data + IV_SIZE, temp, size);
 
     for (byte i = 0; i < IV_SIZE; i++) {
-        data[i] = (byte) (std::rand() % 255);
+        data[i] = (byte) (RANDOM_INTEGER_FUNCTION % 255);
     }
 
     return size + IV_SIZE;
@@ -197,7 +208,7 @@ byte Crypt::genAndInsertChecksum(byte* data, byte size) {
     if (size + CHECKSUM_SIZE > BUFFER_SIZE) {
         return 0;
     }
-    uint16_t checksum = 0;
+    b2byte checksum = 0;
     if (sizeof(checksum) / sizeof(byte) != CHECKSUM_SIZE) {
         return 0;
     }
@@ -214,13 +225,22 @@ byte Crypt::genAndInsertChecksum(byte* data, byte size) {
     return size + CHECKSUM_SIZE;
 }
 
+byte Crypt::de_ob_fuscateWithIV(byte* data, byte size) {
+    if (size <= IV_SIZE) return 0;
+
+    for (byte i = IV_SIZE; i < size; i++) {
+        data[i] ^= data[i % IV_SIZE];
+    }
+    return size;
+}
+
 byte Crypt::testAndRemoveChecksum(byte* data, byte size) {
-    uint16_t constructedChecksum = 0;
+    b2byte constructedChecksum = 0;
     if (sizeof(constructedChecksum) / sizeof(byte) != CHECKSUM_SIZE) {
         return 0;
     }
     for (byte i = 0; i < CHECKSUM_SIZE; i++) {
-        constructedChecksum |= (static_cast<uint16_t>(data[size - CHECKSUM_SIZE + i]) << (8 * (CHECKSUM_SIZE - 1 - i)));
+        constructedChecksum |= (static_cast<b2byte>(data[size - CHECKSUM_SIZE + i]) << (8 * (CHECKSUM_SIZE - 1 - i)));
     }
     
     for (byte i = 0; i < size - CHECKSUM_SIZE; i++) {
@@ -242,6 +262,7 @@ Crypt::Crypt(const byte* key, const byte size) {
 byte Crypt::encrypt(byte* data, byte size) {
     size = genAndInsertIV(data, size);
     size = genAndInsertChecksum(data, size);
+    size = de_ob_fuscateWithIV(data, size);
 	for (byte round = 0; round < ROUNDS; round++) {
         enc_dec_byteArray(data, size, round, &Crypt::encodeByte);
 	}
@@ -252,6 +273,7 @@ byte Crypt::decrypt(byte* data, byte size) {
 	for (byte round = ROUNDS; round-- > 0;) {
         enc_dec_byteArray(data, size, round, &Crypt::decodeByte);
 	}
+    size = de_ob_fuscateWithIV(data, size);
     size = testAndRemoveChecksum(data, size);
     memcpy(data, data + IV_SIZE, size);
 
@@ -270,6 +292,8 @@ byte Crypt::decrypt(byte* data, byte size) {
 
 
 void printBytes(const byte* data, byte size) {
+    std::cout << "Tamanho: " << (int)size << " | Dados: ";
+
     for (byte i = 0; i < size; i++) {
         std::cout << static_cast<int>(data[i]) << " ";
     }
@@ -299,12 +323,12 @@ int main()
     const byte masterKey[] PROGMEM = {0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01};
     Crypt crypt(masterKey, sizeof(masterKey));
 
-    for (byte i = 0; i < 10; i++) {
+    for (byte i = 0; i < 2; i++) {
         testGens(crypt);
     }
 
-    byte otherEncrypted[15] = {0};
-    const int otherValues[] = {40, 41, 56, 168, 156, 143, 94, 86, 101, 125, 204, 87, 240, 134, 173};
+    byte otherEncrypted[27] = {0};
+    const int otherValues[] = {23, 174, 139, 8, 237, 230, 107, 116, 27, 189, 88, 98, 97, 31, 63, 55, 241, 127, 187, 203, 172, 193, 114, 229, 222, 11, 215};
     for (byte i = 0; i < sizeof(otherEncrypted); i++) {
         otherEncrypted[i] = (byte) otherValues[i];
     }
