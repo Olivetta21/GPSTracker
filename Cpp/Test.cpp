@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <cstdint>
-#include "Crypt.cpp"
+#include "Crypt.h"
 
 
 void printBytes(const byte* data, byte size) {
