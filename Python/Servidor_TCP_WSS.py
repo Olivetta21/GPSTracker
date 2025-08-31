@@ -2,8 +2,7 @@ import socket
 import struct
 import threading
 import time
-from nacl.public import PrivateKey, PublicKey, Box
-#from nacl.exceptions import CryptoError
+from CryptLib.Crypt import Crypt
 from dotenv import load_dotenv
 import os
 import asyncio
@@ -14,7 +13,7 @@ from datetime import datetime
 
 load_dotenv()
 
-class VehLocation:
+class TrackerLocation:
     def __init__(self, veh, lat, lng):
         self.veh = veh
         self.lat = lat
@@ -54,87 +53,76 @@ class FMsg:
 class TCP:
     # RESPONSE TABLE
     R_OK = b'\x01'
-    R_PK = b'\x02'
-    R_TK = b'\x03'
-
-    SERVER_PRIVATE = PrivateKey(bytes.fromhex(os.getenv('SERVER_PRIVATE_KEY', '')))
-
-    def __new__(cls):
-        if not TCP.SERVER_PRIVATE:
-            TCP.log("[!] Chave privada do servidor não configurada.")
-            raise AuthError("Chave privada do servidor não configurada.")
-        TCP.log(f"[$] Chave pública do servidor: {TCP.SERVER_PRIVATE.public_key.encode().hex()}")
-        return super().__new__(cls)
-
+    R_PLAIN_TOKEN_OK = b'\x02'
+    R_TOKEN_OK = b'\x03'
+    
     def __init__(self, host='0.0.0.0', port=12345):
         self.host = host
-        self.port = port    
+        self.port = port
     
     @staticmethod
     def log(msg):
         MESSAGES_LOG.put(f"[TCP]{msg}")
 
 
-    class ConnVehicle:
-        def recVehPubKey(self, conn):
-            try:
-                pubkey_veiculo = conn.recv(32)
-                if len(pubkey_veiculo) != 32:
-                    return None
-                return PublicKey(pubkey_veiculo)
-            except Exception as e:
-                TCP.log(f"[!] Erro ao receber chave pública do veículo: {e}")
-                return None
+    class ConnTracker:
+        TEMP_TABLE_KEYS = {
+            "arduino001": bytearray([0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01]),            
+            "aa": bytearray([0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01])
+        }
 
-        def recVehToken(self, conn, BOX):
+        def recTrackerPlainToken(self, conn):
             try:
-                token = BOX.decrypt(conn.recv(1024))
-                if len(token) != 10:
-                    return None
-                return token.decode(errors='ignore').rstrip('\x00')
+                self.token = conn.recv(32).decode(errors='ignore').rstrip('\x00')
+                if self.token not in TCP.ConnTracker.TEMP_TABLE_KEYS:
+                    TCP.log(f"[!] Plain Token não encontrado na tabela")
+                    return False
+                self.Crypt = Crypt()
+                self.Crypt.setKeys(bytearray(TCP.ConnTracker.TEMP_TABLE_KEYS[self.token]))
+                return True
             except Exception as e:
-                TCP.log(f"[!] Erro ao receber token do veículo: {e}")
-                return None
-            
+                TCP.log(f"[!] Erro ao receber plain token do rastreador: {e}")
+            return False
+
+        def recValidateTracker(self, conn):
+            try:
+                if self.Crypt.decrypt(bytearray(conn.recv(1024))):
+                    return True
+            except Exception as e:
+                TCP.log(f"[!] Erro ao validar rastreador: {e}")
+            return False
 
         def __init__(self, conn, addr):
             self.conn = conn
             self.addr = addr
-            self.pub_key = None
             self.token = None
-            self.box = None
+            self.Crypt = None
 
         def __enter__(self):
-            TCP.log(f"[+] Veículo conectado por {self.addr}")
+            TCP.log(f"[+] Rastreador conectado por {self.addr}")
 
-            # Chave publica do veículo
-            self.pub_key = self.recVehPubKey(self.conn)
-            if self.pub_key is None:
-                TCP.log(f"[!] Chave pública inválida de {self.addr}. Desconectando...")
-                raise AuthError("Chave pública inválida.")
-            self.conn.sendall(TCP.R_PK)
-            self.box = Box(TCP.SERVER_PRIVATE, self.pub_key)
+            # Pegar plain token do rastreador            
+            if not self.recTrackerPlainToken(self.conn):
+                TCP.log(f"[!] Plain Token inválido de {self.addr}. Desconectando...")
+                raise AuthError("Plain Token inválido.")
+            self.conn.sendall(TCP.R_PLAIN_TOKEN_OK)
 
-            # Pegar token descriptografado do veículo
-            self.token = self.recVehToken(self.conn, self.box)
-            if self.token is None:
-                TCP.log(f"[!] Token inválido de {self.addr}. Desconectando...")
-                raise AuthError("Token inválido.")
-            self.conn.sendall(TCP.R_TK)
+            # Espera validação do rastreador
+            if not self.recValidateTracker(self.conn):
+                TCP.log(f"[!] O rastreador {self.addr} não foi validado. Desconectando...")
+                raise AuthError("Não validado.")
+            self.conn.sendall(TCP.R_TOKEN_OK)
 
             return self
 
         def __exit__(self, exc_type, exc_val, exc_tb):
-            TCP.log(f"[-] Desligando veículo {self.token or "não identificado"}...")
+            TCP.log(f"[-] Desligando rastreador {self.token or "não identificado"}...")
             self.conn.close()
 
-    def handleVehicle(self, connection, address):
+    def handleTracker(self, connection, address):
         try:
-            with TCP.ConnVehicle(connection, address) as v:
-                TCP.log(f"[$] Chave pública recebida de {v.addr}: {v.pub_key.encode().hex()}")
+            with TCP.ConnTracker(connection, address) as v:
                 TCP.log(f"[$] Token recebido de {v.addr}: '{v.token}'")
-
-                #todo: verificar se esse token é valido no banco
 
                 while True:
                     # Espera por latitude e longitude
@@ -146,7 +134,8 @@ class TCP:
                     lat, lng = None, None
 
                     try: # Desencripta e separa
-                        DATA_DECRYPTED = v.box.decrypt(DATA)
+                        DATA_DECRYPTED = bytearray(DATA)
+                        v.Crypt.decrypt(DATA_DECRYPTED)
                         if len(DATA_DECRYPTED) != 8:
                             TCP.log(f"[!] Pacote decifrado inválido ({len(DATA_DECRYPTED)} bytes)")
                             continue
@@ -159,7 +148,7 @@ class TCP:
                     v.conn.sendall(TCP.R_OK)
                     TCP.log(f"[v] {v.token} {len(DATA)}bytes LAT:{lat:.6f} LNG:{lng:.6f}")
                     # Envia nova localização para o WebSocket
-                    WSS.FILA_THREAD_NEW_LOC.put(VehLocation(v.token, lat, lng))
+                    WSS.FILA_THREAD_NEW_LOC.put(TrackerLocation(v.token, lat, lng))
 
         except AuthError as e:
             TCP.log(f"[!] Erro de autenticação: {e}")
@@ -178,7 +167,7 @@ class TCP:
                 time.sleep(0.2) # Evitar sobrecarga
                 try:
                     conn, addr = s.accept()
-                    threading.Thread(target=self.handleVehicle, args=(conn, addr), daemon=True).start()
+                    threading.Thread(target=self.handleTracker, args=(conn, addr), daemon=True).start()
                 except Exception as e:
                     TCP.log(f"[Falha ao iniciar thread]: {e}")
                     break
@@ -281,7 +270,7 @@ class WSS:
             try:
                 new_loc = WSS.FILA_THREAD_NEW_LOC.get()
                 
-                if new_loc is None or not isinstance(new_loc, VehLocation):
+                if new_loc is None or not isinstance(new_loc, TrackerLocation):
                     WSS.log("[!] Localização inválida recebida. Ignorando...")
                     continue
                             

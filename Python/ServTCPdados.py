@@ -2,28 +2,23 @@ import socket
 import struct
 import time
 import random
-from nacl.public import PrivateKey, PublicKey, Box
+from CryptLib.Crypt import Crypt
 
 # RESPONSE TABLE
 R_OK = b'\x01'
-R_PK = b'\x02'
-R_TK = b'\x03'
+R_PLAIN_TOKEN_OK = b'\x02'
+R_TOKEN_OK = b'\x03'
 
 # SERVER AND CLIENT CONFIGURATION
 HOST = '127.0.0.1'
 PORT = 12345
 TOKEN = b'arduino001'
 INTERVAL = 10
-MAXSTACK = 99
+MAXSTACK = 10
 
-# SERVER ENCRYPTION
-SERVER_PUBLIC_HEX = '5173ed5025b8e0aabc53119349697cb2adf34236f467f89a8cd14f3f1b4e2719'
-client_public = None
-box = None
-
-
-def formatToken(token):
-    return token[:10].ljust(10, b'\x00') # Garantir 10 bytes
+# ENCRYPTION
+tracker_key = bytearray([0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x01])
+crypt = Crypt()
 
 def enviarLocalizacao(sock, lat, lng):    
     if sock is None or sock.fileno() == -1:
@@ -31,10 +26,9 @@ def enviarLocalizacao(sock, lat, lng):
         return False
     
     # Montar Pacote
-    encrypted = box.encrypt(
-        struct.pack('<ff', lat, lng) # 8 bytes total
-    )
-    sock.sendall(encrypted)
+    encrypted = bytearray(struct.pack('<ff', lat, lng))
+    if crypt.encrypt(encrypted):
+        sock.sendall(encrypted)
 
     print(f"[→] Enviando: {lat:.6f}, {lng:.6f}\n[?] pacote criptografado: {encrypted.hex()}\n[~] Tamanho: {len(encrypted)} bytes")
 
@@ -48,18 +42,21 @@ def enviarLocalizacao(sock, lat, lng):
 def conectar():
     try:
         sock = socket.create_connection((HOST, PORT), timeout=5)
-        # Enviando chave em plain text
-        print("[→] Enviando chave pública...")
-        sock.sendall(client_public.encode())
-        if sock.recv(1024) != R_PK:
+
+        # Enviando token em plain text
+        print("[→] Enviando plain token...")
+        sock.sendall(TOKEN)
+        if sock.recv(1024) != R_PLAIN_TOKEN_OK:
             print("[-] Resposta inesperada. Verifique a chave pública.")
             sock.close()
             return None
-        
-        # Enviando token já criptografado
-        print("[→] Enviando token...")
-        sock.sendall(box.encrypt(formatToken(TOKEN)))
-        if sock.recv(1024) != R_TK:
+
+        # Mensagem de confirmação
+        print("[→] Enviando encripted...")
+        encrypted = bytearray(random.randbytes(4))
+        crypt.encrypt(encrypted)
+        sock.sendall(encrypted)
+        if sock.recv(1024) != R_TOKEN_OK:
             print("[-] Resposta inesperada. Verifique o token.")
             sock.close()
             return None
@@ -70,10 +67,8 @@ def conectar():
     return None
 
 def main():
-    global client_public, box, HOST, PORT, TOKEN
-    client_private = PrivateKey.generate()
-    client_public = client_private.public_key
-    box = Box(client_private, PublicKey(bytes.fromhex(SERVER_PUBLIC_HEX)))
+    global HOST, PORT, TOKEN
+    crypt.setKeys(tracker_key)
 
     HOST = input(f"Endereço do host [{HOST}]: ") or HOST
     PORT = input(f"Porta [{PORT}]: ") or PORT
