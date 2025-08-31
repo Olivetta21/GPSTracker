@@ -23,3 +23,10 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# C/Cpp compilers
+*.o
+*.obj
+*.so
+*.dll
+*.exe
