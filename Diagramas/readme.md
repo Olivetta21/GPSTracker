@@ -1,6 +1,6 @@
 # Diagramas:
 
-1. [Casos de Uso](https://) - Como os usuários interagem com o sistema.
+1. [Casos de Uso](CasoDeUso.png) - Funcionamento geral do sistema.
 
 2. [Entidade](https://) - Modelo do banco de dados.
 
