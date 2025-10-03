@@ -12,44 +12,45 @@ RF-06| O cliente pode ou não modificar rastreadores.
 RF-07| O cliente pode ou não alterar informações do seu perfil.
 RF-08| O cliente pode ou não transferir a posse de um rastreador.
 RF-09| O cliente pode ou não gerenciar usuários vinculados a um rastreador (adicionar, remover, aceitar, revogar, pausar, retomar).
-RF-10| O cliente pode ou não receber atualizações em tempo real do rastreio.
-RF-11| O cliente pode ou não receber propostas de inclusão em um rastreador.
-RF-12| O cliente pode ou não ocultar intervalos de rastreio.
-RF-13| O cliente pode ou não desativar/ativar o seu rastreador.
-RF-14| O rastreador pode ou não se conectar ao servidor.
-RF-15| O rastreador pode ou não enviar localizações ao servidor.
-RF-16| O rastreador pode ou não ser rastreado.
-RF-17| O rastreador pode ou não receber pedidos de rastreamento de outros usuários.
-RF-18| O sistema pode ou não permitir a ligação de múltiplos clientes a um mesmo rastreador, enviando localizações salvas (exceto intervalos ocultos).
-RF-19| O sistema pode ou não permitir o envio de localizações em tempo real para clientes autorizados.
+RF-10| O cliente pode ou não receber as localizações salvas do rastreador.
+RF-11| O cliente pode ou não receber atualizações em tempo real do rastreio.
+RF-12| O cliente pode ou não receber propostas de inclusão em um rastreador.
+RF-13| O cliente pode ou não ocultar intervalos de rastreio.
+RF-14| O cliente pode ou não desativar/ativar o seu rastreador.
+RF-15| O rastreador pode ou não se conectar ao servidor.
+RF-16| O rastreador pode ou não enviar localizações ao servidor.
+RF-17| O rastreador pode ou não ser rastreado.
+RF-18| O rastreador pode ou não receber pedidos de rastreamento de outros usuários.
+RF-19| O sistema pode ou não permitir a ligação de múltiplos clientes a um mesmo rastreador, enviando localizações salvas (exceto intervalos ocultos).
+RF-20| O sistema pode ou não permitir o envio de localizações em tempo real para clientes autorizados.
 
 3. Ações do Cliente
-RF-20| O cliente deve poder fazer login.
-RF-21| O cliente deve poder registrar um rastreador sem dono.
-RF-22| O cliente deve poder acessar o mapa para visualizar rastreadores.
-RF-23| O cliente deve poder receber localizações de rastreadores autorizados.
-RF-24| O cliente deve poder registrar um rastreador de outro usuário, mediante autorização.
-RF-25| O cliente deve poder autorizar outros usuários a rastrear seu rastreador.
-RF-26| O cliente deve poder revogar a autorização de outros usuários.
-RF-27| O cliente deve poder modificar informações de um rastreador.
-RF-28| O cliente deve poder transferir a propriedade de um rastreador.
-RF-29| O cliente deve poder excluir um rastreador.
-RF-30| O cliente deve poder definir intervalos para ocultar rastreios.
-RF-31| O cliente deve poder recuperar o login/esquecer senha.
-RF-32| O cliente deve poder ativar ou desativar um rastreador.
+RF-21| O cliente deve poder fazer login.
+RF-22| O cliente deve poder registrar um rastreador sem dono.
+RF-23| O cliente deve poder acessar o mapa para visualizar rastreadores.
+RF-24| O cliente deve poder receber localizações de rastreadores autorizados.
+RF-25| O cliente deve poder registrar um rastreador de outro usuário, mediante autorização.
+RF-26| O cliente deve poder autorizar outros usuários a rastrear seu rastreador.
+RF-27| O cliente deve poder revogar a autorização de outros usuários.
+RF-28| O cliente deve poder modificar informações de um rastreador.
+RF-29| O cliente deve poder transferir a propriedade de um rastreador.
+RF-30| O cliente deve poder excluir um rastreador.
+RF-31| O cliente deve poder definir intervalos para ocultar rastreios.
+RF-32| O cliente deve poder recuperar o login/esquecer senha.
+RF-33| O cliente deve poder ativar ou desativar um rastreador.
 
 4. Ações do Rastreador
-RF-33| O rastreador deve poder se conectar ao sistema.
-RF-34| O rastreador deve poder enviar sua localização.
+RF-34| O rastreador deve poder se conectar ao sistema.
+RF-35| O rastreador deve poder enviar sua localização.
 
 5. Ações do Administrador
-RF-35| O administrador deve poder criar usuarios
-RF-36| O administrador deve poder desativar usuarios
-RF-37| O administrador deve poder criar rastreadores
-RF-38| O administrador deve poder desativar rastradores
+RF-36| O administrador deve poder criar usuarios
+RF-37| O administrador deve poder desativar usuarios
+RF-38| O administrador deve poder criar rastreadores
+RF-39| O administrador deve poder desativar rastradores
 
 5. Sistema-Ponte
-RF-39| O sistema deve validar o token de cada rastreador que tentar se conectar.
+RF-40| O sistema deve validar o token de cada rastreador que tentar se conectar.
 RF-41| O sistema deve verificar permissões antes de aceitar o envio de localização de um rastreador.
 RF-42| O sistema deve armazenar localizações recebidas no banco de dados.
 RF-43| O sistema deve enviar localizações em tempo real para clientes autorizados e conectados.

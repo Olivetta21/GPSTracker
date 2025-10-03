@@ -20,7 +20,8 @@ Desenvolvimento em:
         4 Senha
         5 Observacao
         6 Status
-        7 Hardware
+        7 Ativo
+        8 Hardware
 
 2 Permissoes
     1 Cliente:
@@ -31,15 +32,19 @@ Desenvolvimento em:
         5 Alterar Informações do Perfil
         6 Transferir a posse do rastreador
         7 Adicionar/Remover/Aceitar/Revogar/Pausar/Retomar um usuario à seu rastreador
-        8 Receber atualizações em tempo real do rastreio
-        9 Receber propostas de inclusão em um rastreador
-        10 Pode ocultar intervalos de rastreio
-        11 Pode ativar/Desativar um rastreador
+        8 Receber localização salvas do rastrador
+        9 Receber atualizações em tempo real do rastreio
+        10 Querer receber propostas de rastreamento
+        11 Receber propostas de inclusão em um rastreador
+        12 Pode ocultar intervalos de rastreio
+        13 Pode ativar/Desativar um rastreador
     2 Rastreador:
         1 Se conectar ao servidor
         2 Enviar localizações pro servidor
-        3 Pode ser rastreado
-        4 Pode receber pedidos de rastreamento de outros usuarios
+        3 Pode ser registrado
+        4 Pode ser rastreado em tempo real
+        5 Pode ser rastreado com localização salva
+        6 Pode receber pedidos de rastreamento de outros usuarios
     3 Rastreador-para-cliente (multi-ligação):
         1 Enviar localizações salvas (exceto o que tiver dentro do intervalo oculto)
         2 Enviar localizações em tempo real

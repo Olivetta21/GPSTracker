@@ -2,7 +2,7 @@
 
 1. [Casos de Uso](CasoDeUso.png) - Funcionamento geral do sistema.
 
-2. [Entidade](https://) - Modelo do banco de dados.
+2. [Entidade Relacionamento](EntidadeRelacionamento/) - Modelo do banco de dados.
 
 3. [Classes](https://) - Estrutura estática do sistema: classes, atributos, métodos e relacionamentos.
 
