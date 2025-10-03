@@ -1,8 +1,8 @@
 # Sistema completo de rastreamento:
 
-1. [Requisitos de sistema](Requisitos%20de%20Sistema) - Documentação de suas funcionalidades.
+1. [Requisitos de sistema](Requisitos%20de%20Sistema/readme.md) - Documentação de suas funcionalidades.
 
-2. [Diagramas](Diagramas) - Documentação de suas estruturas.
+2. [Diagramas](Diagramas/readme.md) - Documentação de suas estruturas.
 
 3. [Python](Python) - Codigos escritos em python.
 
