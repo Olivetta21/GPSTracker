@@ -10,6 +10,7 @@
         | 2 | (registrado) Visualização do rastreio pausada |
         | 3 | (não registrado) o usuario está aguardando o dono aprovar sua inclusão |
         | 4 | (não registrado) o dono está aguardando um usuario aceitar a proposta |
+        | 5 | (registrado) Este ouvinte recebeu um pedido de transferência, o dono espera pela resposta |
     1. ativo
         | Booleano | Significado |
         | :-: | :- |
