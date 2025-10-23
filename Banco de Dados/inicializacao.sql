@@ -1,4 +1,5 @@
 -- Postgresql
+-- versão: 0.2
 -- em homologação
 
 
@@ -32,7 +33,7 @@ create view vw_usuario as
         u.id, u.nome, u.login, u.email, u.telefone,
         li.tipo_id, li.identidade
     from usuario as u
-    left join legal_ident as li on li.id = u.legal_ident_id
+    join legal_ident as li on li.id = u.legal_ident_id
     where u.ativo = true;
 
 create table administrador (
@@ -73,8 +74,8 @@ create view vw_usuario_rastreador as
         ur.id as ur_id, ur.usuario_id as u_id, ur.nome, ur.status as ur_status, ur.loc_temporeal, ur.loc_salvos,
         r.id as r_id, r.token_publico, r.dono_id, r.status as r_status
     from usuario_rastreador as ur
-    left join rastreador as r on r.id = ur.rastreador_id
-    left join usuario as u on u.id = ur.usuario_id
+    join rastreador as r on r.id = ur.rastreador_id
+    join usuario as u on u.id = ur.usuario_id
     where ur.ativo = true
         and r.ativo = true
         and u.ativo = true;
@@ -97,13 +98,116 @@ create table intervalo_loc_oculta (
     data_final timestamp
 );
 
+-- Permissões de usuario
+create table permissao_usuario (
+    id serial primary key,
+    nome varchar(100) not null
+);
+create table grupo_usuario (
+    id serial primary key,
+    nome varchar(100) not null
+);
+create table vinc_grupo_usuario (
+    id serial primary key,
+    usuario_id integer not null references usuario(id),
+    grupo_id integer not null references grupo_usuario(id)
+);
+create table vinc_perm_usuario (
+    id serial primary key,
+    grupo_id integer references grupo_usuario(id),
+    usuario_id integer references usuario(id),
+    perm_id integer not null references permissao_usuario(id),
+    negado boolean not null default false
+);
+-- Ver permissoes do grupo
+create view vw_permissoes_grupo_usuario as
+    select gu.id as grupo_id, vpu.perm_id, vpu.negado
+    from grupo_usuario gu
+    join vinc_perm_usuario vpu on vpu.grupo_id = gu.id;
+-- Ver permissoes do usuario
+create view vw_permissoes_usuario as
+	select usuario_id, perm_id, CASE WHEN COUNT(*) > 1 THEN TRUE ELSE FALSE END AS negado
+	from (
+		select usuario_id, perm_id, negado from (
+		    select vpu.usuario_id, vpu.perm_id, vpu.negado
+		    from vinc_perm_usuario vpu
+			where usuario_id is not null
+		    union all
+		    select vgu.usuario_id, vpu.perm_id, vpu.negado
+			from vinc_grupo_usuario vgu
+			join vinc_perm_usuario vpu on vpu.grupo_id = vgu.grupo_id
+		) group by usuario_id, perm_id, negado
+	)
+	group by usuario_id, perm_id;
+
+
+select * from vw_permissoes_usuario order by usuario_id, perm_id;
+select * from vw_permissoes_grupo_usuario;
+
+
+
+
+-- Permisões de rastreador
+create table permissao_rastreador (
+    id serial primary key,
+    nome varchar(100) not null
+);
+create table grupo_rastreador (
+    id serial primary key,
+    nome varchar(100) not null
+);
+create table vinc_grupo_rastreador (
+    id serial primary key,
+    rastreador_id integer not null references rastreador(id),
+    grupo_id integer not null references grupo_rastreador(id)
+);
+create table vinc_perm_rastreador (
+    id serial primary key,
+    grupo_id integer references grupo_rastreador(id),
+    rastreador_id integer references rastreador(id),
+    perm_id integer not null references permissao_rastreador(id),
+    negado boolean not null default false
+);
+-- Permissoes do grupo rastreador
+create view vw_permissoes_grupo_rastreador as
+    select gr.id as grupo_id, vpr.perm_id, vpr.negado
+    from grupo_rastreador gr
+    join vinc_perm_rastreador vpr on vpr.grupo_id = gr.id;
+-- Permissoes do rastreador
+create view vw_permissoes_rastreador as
+    select rastreador_id, perm_id, CASE WHEN COUNT(*) > 1 THEN TRUE ELSE FALSE END AS negado
+    from (
+        select rastreador_id, perm_id, negado from (
+            select vpr.rastreador_id, vpr.perm_id, vpr.negado
+            from vinc_perm_rastreador vpr
+            where rastreador_id is not null
+            union all
+            select vgr.rastreador_id, vpr.perm_id, vpr.negado
+            from vinc_grupo_rastreador vgr
+            join vinc_perm_rastreador vpr on vpr.grupo_id = vgr.grupo_id
+        ) group by rastreador_id, perm_id, negado
+    )
+    group by rastreador_id, perm_id;
+
+
+select * from vw_permissoes_rastreador order by rastreador_id, perm_id;
+select * from vw_permissoes_grupo_rastreador;
+
+
+
+
+
+
+
+
+
 
 
 
 
 -- Pegar todos os ouvintes de um rastreador específico, a consulta está sendo feita pelo dono do rastreador
 -- Terá que usar função para melhor desempenho
-create or replace function fn_ouvintes_rastreador(rastreador_id_input integer, dono_id_input integer)
+create function fn_ouvintes_rastreador(rastreador_id_input integer, dono_id_input integer)
 returns table (
     usuario_id integer,
     status integer,
@@ -129,7 +233,7 @@ returns table (
             ur.usuario_id, ur.status, ur.loc_temporeal, ur.loc_salvos,
             u.nome
         from usuario_rastreador as ur
-        left join usuario as u on u.id = ur.usuario_id
+        join usuario as u on u.id = ur.usuario_id
         where ur.rastreador_id = var_rastreador_id
         and ur.usuario_id != dono_id_input
         and ur.ativo = true
@@ -143,7 +247,7 @@ $$ language plpgsql;
 
 -- Todas as localizações salvas permitidas de um rastreador específico
 -- Terá que usar função para melhor desempenho
-create or replace function fn_loc_salvas_permitidas(rastreador_id_input integer, usuario_id_input integer)
+create function fn_loc_salvas_permitidas(rastreador_id_input integer, usuario_id_input integer)
 returns table (
     id integer,
     lat double precision,
@@ -229,9 +333,50 @@ insert into intervalo_loc_oculta (usuario_rastreador_id, data_inicial, data_fina
 insert into intervalo_loc_oculta (usuario_rastreador_id, data_inicial, data_final) values (4, '2024-12-05 00:00:00', '2024-12-10 23:59:59');
 
 
-
-
-select * from vw_usuario;
-select * from vw_usuario_rastreador;
-select * from fn_ouvintes_rastreador(1,1);
-select * from fn_loc_salvas_permitidas(1,2);
+insert into permissao_usuario (nome) values ('Login');
+insert into permissao_usuario (nome) values ('Ver Mapa');
+insert into permissao_usuario (nome) values ('Registrar Rastreador');
+insert into permissao_usuario (nome) values ('Modificar Rastreador');
+insert into permissao_usuario (nome) values ('Modificar Perfil');
+insert into permissao_usuario (nome) values ('Transferir Posse');
+insert into permissao_usuario (nome) values ('Gerenciar ouvintes');
+insert into permissao_usuario (nome) values ('Rastreio Salvo');
+insert into permissao_usuario (nome) values ('Rastreio T.R.');
+insert into permissao_usuario (nome) values ('Quer Propostas Rastreio');
+insert into permissao_usuario (nome) values ('Proposta Rastreio');
+insert into permissao_usuario (nome) values ('Intervalo Oculto');
+insert into permissao_usuario (nome) values ('Desativar Rastreador');
+insert into permissao_rastreador (nome) values ('Conexão');
+insert into permissao_rastreador (nome) values ('Enviar Localização');
+insert into permissao_rastreador (nome) values ('Resgistrável');
+insert into permissao_rastreador (nome) values ('Rastreável R.T');
+insert into permissao_rastreador (nome) values ('Rastreável');
+insert into permissao_rastreador (nome) values ('Ouvintes');
+insert into grupo_usuario (nome) values ('Grupo Usuario 1');
+insert into grupo_usuario (nome) values ('Grupo Usuario 2');
+insert into grupo_rastreador (nome) values ('Grupo Rastreador A');
+insert into grupo_rastreador (nome) values ('Grupo Rastreador B');
+insert into vinc_grupo_usuario (usuario_id, grupo_id) values (1, 1); -- usuario 1 no grupo 1
+insert into vinc_grupo_usuario (usuario_id, grupo_id) values (1, 2); -- usuario 1 no grupo 2
+insert into vinc_grupo_usuario (usuario_id, grupo_id) values (3, 1); -- usuario 3 no grupo 1
+insert into vinc_grupo_usuario (usuario_id, grupo_id) values (3, 2); -- usuario 3 no grupo 2
+insert into vinc_grupo_usuario (usuario_id, grupo_id) values (5, 1); -- usuario 5 no grupo 1
+insert into vinc_grupo_rastreador (rastreador_id, grupo_id) values (1, 1); -- rastreador 1 no grupo 1
+insert into vinc_perm_usuario (grupo_id, perm_id, negado) values (1, 1, false);
+insert into vinc_perm_usuario (grupo_id, perm_id, negado) values (1, 2, false);
+insert into vinc_perm_usuario (grupo_id, perm_id, negado) values (1, 3, false);
+insert into vinc_perm_usuario (grupo_id, perm_id, negado) values (1, 4, false);
+insert into vinc_perm_usuario (grupo_id, perm_id, negado) values (2, 1, false);
+insert into vinc_perm_usuario (grupo_id, perm_id, negado) values (2, 2, true);
+insert into vinc_perm_usuario (grupo_id, perm_id, negado) values (2, 4, true);
+insert into vinc_perm_usuario (usuario_id, perm_id, negado) values (1, 5, false); -- usuario 1 perm de 1 a 4 do grupo mais a 5 individual
+insert into vinc_perm_usuario (usuario_id, perm_id, negado) values (2, 3, false);
+insert into vinc_perm_usuario (usuario_id, perm_id, negado) values (3, 4, true); -- nega permissão 4 para usuario 3
+insert into vinc_perm_usuario (usuario_id, perm_id, negado) values (4, 5, false);
+insert into vinc_perm_usuario (usuario_id, perm_id, negado) values (5, 1, false);
+insert into vinc_perm_usuario (usuario_id, perm_id, negado) values (5, 2, false);
+insert into vinc_perm_usuario (usuario_id, perm_id, negado) values (5, 3, false);
+insert into vinc_perm_usuario (usuario_id, perm_id, negado) values (5, 4, false);
+insert into vinc_perm_usuario (usuario_id, perm_id, negado) values (5, 5, false);
+insert into vinc_perm_usuario (usuario_id, perm_id, negado) values (5, 6, false);
+insert into vinc_perm_rastreador (grupo_id, perm_id, negado) values (1, 1, false);
