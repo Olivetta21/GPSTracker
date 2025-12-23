@@ -29,12 +29,15 @@ create table usuario (
 );
 
 create view vw_usuario as
+    select * from usuario
+    where ativo = true;
+
+create view vw_usuario_completo as
     select
         u.id, u.nome, u.login, u.email, u.telefone,
         li.tipo_id, li.identidade
-    from usuario as u
-    join legal_ident as li on li.id = u.legal_ident_id
-    where u.ativo = true;
+    from vw_usuario as u
+    join legal_ident as li on li.id = u.legal_ident_id;
 
 create table administrador (
     id integer primary key references usuario(id)
@@ -53,7 +56,7 @@ create table rastreador (
 );
 
 create view vw_rastreador as
-    select id, token_publico, status, dono_id
+    select *
     from rastreador
     where ativo = true;
 
@@ -68,17 +71,24 @@ create table usuario_rastreador (
     loc_salvos boolean not null default true
 );
 
--- Pegar todos os vinculos de rastreadores e usuarios
 create view vw_usuario_rastreador as
-    select
-        ur.id as ur_id, ur.usuario_id as u_id, ur.nome, ur.status as ur_status, ur.loc_temporeal, ur.loc_salvos,
-        r.id as r_id, r.token_publico, r.dono_id, r.status as r_status
-    from usuario_rastreador as ur
-    join rastreador as r on r.id = ur.rastreador_id
-    join usuario as u on u.id = ur.usuario_id
-    where ur.ativo = true
-        and r.ativo = true
-        and u.ativo = true;
+    select *
+    from usuario_rastreador
+    where ativo = true;
+
+-- Mostra todos os rastreadores e seus ouvintes
+create view vw_vinculo_rastreadores as
+    select 
+        ur.id as ur_id, ur.nome as ur_nome, ur.status as ur_status, ur.loc_temporeal, ur.loc_salvos,
+        r.id as r_id, r.hardware, r.token_publico, r.status as r_status,
+		d.id as d_id, d.nome as d_nome,
+        u.id as u_id, u.nome as u_nome, u.email, u.telefone
+        from vw_rastreador r
+        join vw_usuario d on r.dono_id = d.id
+        left join vw_usuario_rastreador ur on r.id = ur.rastreador_id
+        left join vw_usuario u on ur.usuario_id = u.id;
+
+select * from vw_vinculo_rastreadores where u_id = 1 or (d_id = 1 and u_id is null);
 
 create table localizacao (
     id serial primary key,
@@ -91,12 +101,47 @@ create table localizacao (
 
 create table intervalo_loc_oculta (
     id serial primary key,
-    usuario_rastreador_id integer not null references usuario_rastreador(id),
+    rastreador_id integer not null references rastreador(id),
     id_inicial integer,
     id_final integer,
     data_inicial timestamp,
-    data_final timestamp
+    data_final timestamp,
+    identificacao varchar(100),
+    novos_ouvintes boolean not null default true
 );
+
+create table vinc_loc_oculta_usuario_rastreador (
+    usuario_rastreador_id integer not null references usuario_rastreador(id),
+    intervalo_loc_oculta_id integer not null references intervalo_loc_oculta(id),
+    primary key (usuario_rastreador_id, intervalo_loc_oculta_id)
+);
+
+-- Mostra quem sao os ouvintes de cada intervalo de localizacao oculta
+create view vw_intervalo_loc_oculta_ouvintes as
+    select
+    ilo.id as ilo_id, ilo.identificacao, ilo.id_inicial, ilo.id_final, ilo.data_inicial, ilo.data_final, ilo.novos_ouvintes,
+    ur.rastreador_id, ur.usuario_id
+    from vinc_loc_oculta_usuario_rastreador vlour
+    join intervalo_loc_oculta ilo on vlour.intervalo_loc_oculta_id = ilo.id
+    join usuario_rastreador ur on vlour.usuario_rastreador_id = ur.id;
+
+-- Mostra todas as localizacoes de cada ouvinte e se a localizacao esta oculta para ele
+create view vw_vinc_localizacao_ouvintes as
+    select l.*, ur.usuario_id,
+    case when exists (
+        select 1 from vw_intervalo_loc_oculta_ouvintes iloo --filtro
+        where iloo.rastreador_id = l.rastreador_id
+        and iloo.usuario_id = ur.usuario_id
+        and (
+            (l.data >= iloo.data_inicial and l.data <= iloo.data_final) or
+            (l.id >= iloo.id_inicial and l.id <= iloo.id_final)
+        )
+        limit 1
+    ) then true else false end as oculto	
+    from localizacao l
+    join vw_usuario_rastreador ur on l.rastreador_id = ur.rastreador_id;
+
+
 
 -- Permissões de usuario
 create table permissao_usuario (
@@ -139,10 +184,6 @@ create view vw_permissoes_usuario as
 		) group by usuario_id, perm_id, negado
 	)
 	group by usuario_id, perm_id;
-
-
-select * from vw_permissoes_usuario order by usuario_id, perm_id;
-select * from vw_permissoes_grupo_usuario;
 
 
 
@@ -190,147 +231,111 @@ create view vw_permissoes_rastreador as
     group by rastreador_id, perm_id;
 
 
-select * from vw_permissoes_rastreador order by rastreador_id, perm_id;
-select * from vw_permissoes_grupo_rastreador;
-
-
-
-
-
-
-
-
-
-
-
-
-
--- Pegar todos os ouvintes de um rastreador específico, a consulta está sendo feita pelo dono do rastreador
--- Terá que usar função para melhor desempenho
-create function fn_ouvintes_rastreador(rastreador_id_input integer, dono_id_input integer)
-returns table (
-    usuario_id integer,
-    status integer,
-    loc_temporeal boolean,
-    loc_salvos boolean,
-    nome varchar(100)
-) as $$
-    declare
-        var_rastreador_id integer;
-    begin
-        -- Verifica se o rastreador existe e pertence ao dono
-        select r.id into var_rastreador_id from vw_rastreador r
-        where r.id = rastreador_id_input
-        and r.dono_id = dono_id_input;
-        -- retorna se não encontrar
-        if not found or var_rastreador_id is null then
-            return;
-        end if;
-
-        -- Pega os ouvintes do rastreador
-        return query
-        select
-            ur.usuario_id, ur.status, ur.loc_temporeal, ur.loc_salvos,
-            u.nome
-        from usuario_rastreador as ur
-        join usuario as u on u.id = ur.usuario_id
-        where ur.rastreador_id = var_rastreador_id
-        and ur.usuario_id != dono_id_input
-        and ur.ativo = true
-        and u.ativo = true;
-    end;
-$$ language plpgsql;
-
-
-
-
-
--- Todas as localizações salvas permitidas de um rastreador específico
--- Terá que usar função para melhor desempenho
-create function fn_loc_salvas_permitidas(rastreador_id_input integer, usuario_id_input integer)
-returns table (
-    id integer,
-    lat double precision,
-    lng double precision,
-    data timestamp,
-    invalida boolean
-) as $$
-    declare
-        var_ur_id integer;
-    begin
-        -- Verifica se o rastreador existe e o usuario tem esse rastreador registrado, e guarda o id para usar no filtro
-        select ur.ur_id into var_ur_id from vw_usuario_rastreador ur
-        where ur.r_id = rastreador_id_input
-        and ur.u_id = usuario_id_input;
-        -- retorna se não encontrar
-        if not found or var_ur_id is null then
-            return;
-        end if;
-
-        -- Pega as localizações salvas já excluindo os filtros
-        return query
-        select l.id, l.lat, l.lng, l.data, l.invalida
-        from localizacao as l
-        where l.rastreador_id = rastreador_id_input
-        and not exists (
-            select 1 from intervalo_loc_oculta as f --filtro
-            where f.usuario_rastreador_id = var_ur_id
-            and (
-                (l.data >= f.data_inicial and l.data <= f.data_final) or
-                (l.id >= f.id_inicial and l.id <= f.id_final)
-            )
-        );
-    end;
-$$ language plpgsql;
-
-
 
 
 
 insert into legal_ident_tipo (descricao, regex) values ('Geral', '.+');
 insert into legal_ident (tipo_id, identidade) values (1, '123456789');
 
-insert into usuario (nome, login, senha, legal_ident_id) values ('Dono Exemplo', 'donoexemplo', '123', 1);
-insert into usuario (nome, login, senha, legal_ident_id) values ('Ouvinte Exemplo', 'ouvinteexemplo', '123', 1);
+insert into usuario (nome, login, senha, legal_ident_id) values ('Ivan Luiz', 'donoexemplo', '123', 1);
+insert into usuario (nome, login, senha, legal_ident_id) values ('Kelvin Garcete', 'ouvinteexemplo', '123', 1);
 insert into usuario (nome, login, senha, legal_ident_id) values ('Maria Silva', 'mariasilva', 'senha456', 1);
 insert into usuario (nome, login, senha, legal_ident_id) values ('Carlos Pereira', 'carlospereira', 'senha789', 1);
 insert into usuario (nome, login, senha, legal_ident_id) values ('Ana Oliveira', 'anaoliveira', 'senha321', 1);
+insert into usuario (nome, login, senha, legal_ident_id) values ('Kaio Guerreiro', 'kaioguerreiro', 'senha321', 1);
+insert into usuario (nome, login, senha, legal_ident_id) values ('Matheus', 'matheus', 'senha321', 1); --7
+insert into usuario (nome, login, senha, legal_ident_id) values ('Guilherme', 'guilherme', 'senha321', 1);
+insert into usuario (nome, login, senha, legal_ident_id) values ('Rafael', 'rafael', 'senha321', 1);
+insert into usuario (nome, login, senha, legal_ident_id) values ('Caio Durks', 'caiodurks', 'senha321', 1);
 
 insert into rastreador (hardware, token, token_publico, senha, obs, status, dono_id) values ('Rastreador Exemplo', 'token123', 'token_publico123', 'senha123', 'Observações sobre o rastreador', 55, 1);
 insert into rastreador (hardware, token, token_publico, senha, obs, status, dono_id) values ('Rastreador Alpha', 'tokenAlpha123', 'tokenPublicoAlpha123', 'senhaAlpha123', 'Rastreador de teste', 1, 2);
 insert into rastreador (hardware, token, token_publico, senha, obs, status, dono_id) values ('Rastreador Beta', 'tokenBeta456', 'tokenPublicoBeta456', 'senhaBeta456', 'Monitoramento em tempo real', 2, 3);
 insert into rastreador (hardware, token, token_publico, senha, obs, status, dono_id) values ('Rastreador Gamma', 'tokenGamma789', 'tokenPublicoGamma789', 'senhaGamma789', 'Acompanhamento de veículos', 2, 4);
+insert into rastreador (hardware, token, token_publico, senha, obs, status, dono_id) values ('Rastreador Charlie', 'tokenCharlie789', 'tokenPublicoCharlie789', 'senhaCharlie789', 'Acompanhamento de veículos', 2, 4);
 
-insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (1, 1, 'Meu Rastreador', 44);
-insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (2, 1, 'Rastreador do Dono Exemplo', 44);
-insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (1, 2, 'Rastreador Alpha', 12);
-insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (2, 1, 'Rastreador Beta', 15);
-insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (3, 3, 'Rastreador Gamma', 10);
-insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (4, 2, 'Rastreador Beta', 9);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (1, 1, 'Meu Exemplo', 44);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (2, 1, 'Rastreador Exemplo do ivan', 44);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (2, 2, 'Meu Alpha', 12);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (1, 2, 'Rastreador Alpha do kelvin', 12);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (3, 3, 'Meu Beta', 10);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (4, 2, 'Rastreador Alpha Kervins', 9);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (4, 4, 'Meu Gamma', 9);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (6, 1, 'R Exe. Ivan', 9);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (6, 2, 'R alpha. kelvin', 9);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (6, 3, 'R beta. maria', 9);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (1, 3, 'iR beta. maria', 9); --11
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (2, 3, 'kR beta. maria', 9);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (7, 3, 'mR beta. maria', 9);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (8, 3, 'gR beta. maria', 9);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (9, 3, 'rR beta. maria', 9);
+insert into usuario_rastreador (usuario_id, rastreador_id, nome, status) values (10, 3, 'cR beta. maria', 9);
 
-insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.55052, -46.633308, '2024-01-01 10:00:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.55100, -46.634000, '2024-01-01 11:00:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.55100, -46.634000, '2024-12-01 11:00:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.55052, -46.633308, '2024-01-02 10:30:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (2, -22.908333, -43.196388, '2024-01-02 11:00:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (3, -25.444444, -49.275000, '2024-01-02 11:30:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (2, -23.567890, -46.6789410, '2024-01-02 12:00:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (3, -21.567890, -46.6789710, '2024-01-02 12:00:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.4890, -46.6789100, '2024-01-02 12:00:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (3, -23.1890, -46.6789102, '2024-01-02 12:00:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (4, -23.87590, -46.6781370, '2024-01-02 12:00:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.89750, -46.6789150, '2024-01-02 12:00:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (3, -23.8930, -46.6789170, '2024-01-02 12:00:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (2, -23.892130, -46.6728910, '2024-01-02 12:00:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (2, -23.89230, -46.6789610, '2024-01-02 12:00:00');
-insert into localizacao (rastreador_id, lat, lng, data) values (2, -23.89560, -46.66478910, '2024-01-02 12:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.55052, -46.633308, '2024-10-25 10:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.55052, -46.633308, '2024-11-01 10:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.55100, -46.634000, '2024-11-06 11:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.55100, -46.634000, '2024-11-15 11:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.55052, -46.633308, '2024-11-30 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.55052, -46.633308, '2024-12-01 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.55052, -46.633308, '2024-12-06 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.55052, -46.633308, '2024-12-15 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.55052, -46.633308, '2024-12-31 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (1, -23.55052, -46.633308, '2025-01-05 10:30:00');--
+insert into localizacao (rastreador_id, lat, lng, data) values (2, -23.55052, -46.633308, '2024-10-25 10:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (2, -23.55052, -46.633308, '2024-11-01 10:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (2, -23.55100, -46.634000, '2024-11-06 11:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (2, -23.55100, -46.634000, '2024-11-15 11:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (2, -23.55052, -46.633308, '2024-11-30 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (2, -23.55052, -46.633308, '2024-12-01 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (2, -23.55052, -46.633308, '2024-12-06 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (2, -23.55052, -46.633308, '2024-12-15 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (2, -23.55052, -46.633308, '2024-12-31 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (2, -23.55052, -46.633308, '2025-01-05 10:30:00');--
+insert into localizacao (rastreador_id, lat, lng, data) values (3, -23.55052, -46.633308, '2024-10-25 10:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (3, -23.55052, -46.633308, '2024-11-01 10:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (3, -23.55100, -46.634000, '2024-11-06 11:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (3, -23.55100, -46.634000, '2024-11-15 11:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (3, -23.55052, -46.633308, '2024-11-30 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (3, -23.55052, -46.633308, '2024-12-01 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (3, -23.55052, -46.633308, '2024-12-06 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (3, -23.55052, -46.633308, '2024-12-15 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (3, -23.55052, -46.633308, '2024-12-31 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (3, -23.55052, -46.633308, '2025-01-05 10:30:00');--
+insert into localizacao (rastreador_id, lat, lng, data) values (4, -23.55052, -46.633308, '2024-10-25 10:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (4, -23.55052, -46.633308, '2024-11-01 10:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (4, -23.55100, -46.634000, '2024-11-06 11:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (4, -23.55100, -46.634000, '2024-11-15 11:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (4, -23.55052, -46.633308, '2024-11-30 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (4, -23.55052, -46.633308, '2024-12-01 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (4, -23.55052, -46.633308, '2024-12-06 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (4, -23.55052, -46.633308, '2024-12-15 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (4, -23.55052, -46.633308, '2024-12-31 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (4, -23.55052, -46.633308, '2025-01-05 10:30:00');--
+insert into localizacao (rastreador_id, lat, lng, data) values (5, -23.55052, -46.633308, '2024-10-25 10:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (5, -23.55052, -46.633308, '2024-11-01 10:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (5, -23.55100, -46.634000, '2024-11-06 11:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (5, -23.55100, -46.634000, '2024-11-15 11:00:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (5, -23.55052, -46.633308, '2024-11-30 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (5, -23.55052, -46.633308, '2024-12-01 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (5, -23.55052, -46.633308, '2024-12-06 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (5, -23.55052, -46.633308, '2024-12-15 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (5, -23.55052, -46.633308, '2024-12-31 10:30:00');
+insert into localizacao (rastreador_id, lat, lng, data) values (5, -23.55052, -46.633308, '2025-01-05 10:30:00');--
 
-insert into intervalo_loc_oculta (usuario_rastreador_id, data_inicial, data_final) values (2, '2024-12-01 00:00:00', '2024-12-31 23:59:59');
-insert into intervalo_loc_oculta (usuario_rastreador_id, id_inicial, id_final) values (1, 2, 2);
-insert into intervalo_loc_oculta (usuario_rastreador_id, data_inicial, data_final) values (1, '2024-11-01 00:00:00', '2024-11-15 23:59:59');
-insert into intervalo_loc_oculta (usuario_rastreador_id, data_inicial, data_final) values (2, '2024-11-10 00:00:00', '2024-11-20 23:59:59');
-insert into intervalo_loc_oculta (usuario_rastreador_id, data_inicial, data_final) values (3, '2024-12-01 00:00:00', '2024-12-15 23:59:59');
-insert into intervalo_loc_oculta (usuario_rastreador_id, data_inicial, data_final) values (4, '2024-12-05 00:00:00', '2024-12-10 23:59:59');
+insert into intervalo_loc_oculta (rastreador_id, identificacao, id_inicial, id_final) values     (1, 'intA', 2, 3);
+insert into intervalo_loc_oculta (rastreador_id, identificacao, data_inicial, data_final) values (2, 'intB', '2024-12-01 00:00:00', '2024-12-31 23:59:59');
+insert into intervalo_loc_oculta (rastreador_id, identificacao, data_inicial, data_final) values (2, 'intC', '2024-11-01 00:00:00', '2024-11-15 23:59:59');
+insert into intervalo_loc_oculta (rastreador_id, identificacao, data_inicial, data_final) values (3, 'intD', '2024-11-10 00:00:00', '2024-11-20 23:59:59');
+insert into intervalo_loc_oculta (rastreador_id, identificacao, data_inicial, data_final) values (3, 'intE', '2024-12-01 00:00:00', '2024-12-15 23:59:59');
+insert into intervalo_loc_oculta (rastreador_id, identificacao, data_inicial, data_final) values (3, 'intF', '2024-12-05 00:00:00', '2024-12-10 23:59:59');
+
+insert into vinc_loc_oculta_usuario_rastreador (usuario_rastreador_id, intervalo_loc_oculta_id) values (8, 1);
+insert into vinc_loc_oculta_usuario_rastreador (usuario_rastreador_id, intervalo_loc_oculta_id) values (6, 2);
+insert into vinc_loc_oculta_usuario_rastreador (usuario_rastreador_id, intervalo_loc_oculta_id) values (9, 3);
+insert into vinc_loc_oculta_usuario_rastreador (usuario_rastreador_id, intervalo_loc_oculta_id) values (11, 4);
+insert into vinc_loc_oculta_usuario_rastreador (usuario_rastreador_id, intervalo_loc_oculta_id) values (13, 5);
+insert into vinc_loc_oculta_usuario_rastreador (usuario_rastreador_id, intervalo_loc_oculta_id) values (14, 5);
+insert into vinc_loc_oculta_usuario_rastreador (usuario_rastreador_id, intervalo_loc_oculta_id) values (16, 6);
 
 
 insert into permissao_usuario (nome) values ('Login');
